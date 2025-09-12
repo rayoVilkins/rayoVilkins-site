@@ -17,8 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:    # Combining into one job
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +56,6 @@ jobs:
       - name: Fetch EA data into DB
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
-          # EA_COOKIES: ${{ secrets.EA_COOKIES }}   # optional if you need cookies later
         run: |
           python fetch_matches.py
 
@@ -209,4 +211,5 @@ jobs:
           path: public
 
       - name: Deploy to Pages
+        id: deployment
         uses: actions/deploy-pages@v4
