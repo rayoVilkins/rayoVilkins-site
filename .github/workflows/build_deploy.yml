@@ -5,7 +5,10 @@ on:
     - cron: "0 5 * * *"    # daily at 05:00 UTC
   workflow_dispatch: {}
   push:
-    branches: [ "main" ]   # optional: build on every push
+    branches: [ "main" ]
+    # Avoid infinite loops when we commit seed_data.sql from the workflow
+    paths-ignore:
+      - 'sql/seed_data.sql'
 
 permissions:
   contents: write
@@ -17,11 +20,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:    # Combining into one job
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -53,11 +57,50 @@ jobs:
           sqlite3 "$DB_PATH" < sql/create_tables.sql
           sqlite3 "$DB_PATH" < sql/create_views.sql
 
+      # ⭐️ Bring back full history from prior runs (if present)
+      - name: Import seed history
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+        run: |
+          if [ -f sql/seed_data.sql ]; then
+            echo "Importing seed_data.sql..."
+            sqlite3 "$DB_PATH" < sql/seed_data.sql
+          else
+            echo "No seed_data.sql found; skipping import."
+          fi
+
       - name: Fetch EA data into DB
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
           python fetch_matches.py
+
+      # ⭐️ Save updated history back to repo (data-only dump)
+      - name: Dump updated seed (data only)
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+        run: |
+          # Adjust table list if you have more data tables
+          sqlite3 "$DB_PATH" ".output sql/seed_data.sql" ".mode insert" \
+            ".dump matches" \
+            ".dump match_clubs" \
+            ".dump match_players" \
+            ".dump match_aggregates" \
+            ".output stdout"
+          # Make sure the file exists so future runs can import it
+          test -s sql/seed_data.sql && echo "seed_data.sql written."
+
+      - name: Commit updated seed to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sql/seed_data.sql
+          if ! git diff --cached --quiet; then
+            git commit -m "Update seed_data.sql [skip ci]"
+            git push
+          else
+            echo "No changes in seed_data.sql to commit."
+          fi
 
       - name: Export JSON endpoints
         env:
@@ -176,8 +219,7 @@ jobs:
             rows = q(conn, query)
             (out / "players" / f"rankings_{pos}.json").write_text(json.dumps({"success": True, "position_filter": pos, "count": len(rows), "players": rows}), encoding="utf-8")
 
-          # 3) Per-match detailed files (only for matches we listed)
-          import itertools
+          # 3) Per-match detailed files
           for m in matches:
             mid = m["match_id"]
             clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
@@ -194,7 +236,6 @@ jobs:
                 ORDER BY club_id, rating DESC
               """, (mid,))
             aggregates = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
-            # Keep it simple: skip head-to-head for v1 (optional later)
             p = out / "matches" / mid / "detailed.json"
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps({"success": True, "match": m, "clubs": clubs, "players": players, "aggregates": aggregates}), encoding="utf-8")
