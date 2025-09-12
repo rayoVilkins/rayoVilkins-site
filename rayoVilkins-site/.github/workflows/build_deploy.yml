@@ -1,0 +1,212 @@
+name: Build & publish static site
+
+on:
+  schedule:
+    - cron: "0 5 * * *"    # daily at 05:00 UTC
+  workflow_dispatch: {}
+  push:
+    branches: [ "main" ]   # optional: build on every push
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ensure SQLite CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+      - name: Prepare build dirs
+        run: |
+          mkdir -p build
+          mkdir -p public/api/matches
+          mkdir -p public/api/players
+
+      - name: Create empty DB & schema
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+        run: |
+          sqlite3 "$DB_PATH" < sql/create_tables.sql
+          sqlite3 "$DB_PATH" < sql/create_views.sql
+
+      - name: Fetch EA data into DB
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+          # EA_COOKIES: ${{ secrets.EA_COOKIES }}   # optional if you need cookies later
+        run: |
+          python fetch_matches.py
+
+      - name: Export JSON endpoints
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+        run: |
+          python - << 'PY'
+          import os, json, sqlite3, pathlib
+
+          DB_PATH = os.environ["DB_PATH"]
+          out = pathlib.Path("public/api")
+          out.mkdir(parents=True, exist_ok=True)
+
+          def q(conn, sql, args=()):
+            c = conn.cursor()
+            c.execute(sql, args)
+            cols = [d[0] for d in c.description]
+            return [dict(zip(cols, r)) for r in c.fetchall()]
+
+          conn = sqlite3.connect(DB_PATH)
+          conn.row_factory = sqlite3.Row
+
+          # 1) Matches (all)
+          matches = q(conn, """
+            SELECT 
+              m.match_id,
+              m.match_timestamp,
+              datetime(m.match_timestamp, 'unixepoch') as match_date,
+              mc1.club_id as our_club_id,
+              mc1.club_name as our_club_name,
+              mc1.goals as our_goals,
+              mc1.goals_against as our_goals_against,
+              mc1.result as our_result,
+              mc1.match_type,
+              mc1.winner_by_dnf,
+              mc1.team_id as our_team_id,
+              mc2.club_id as opponent_club_id,
+              mc2.club_name as opponent_club_name,
+              mc2.goals as opponent_goals,
+              mc2.team_id as opponent_team_id,
+              CASE 
+                WHEN mc1.result = 1 OR mc1.result = 16385 THEN 'W'
+                WHEN mc1.result = 2 OR mc1.result = 10 THEN 'L'
+                WHEN mc1.result = 4 THEN 'D'
+                ELSE 'Unknown'
+              END as result,
+              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.goals || ')', ', ')
+               FROM match_players mp
+               WHERE mp.match_id = m.match_id AND mp.club_id = '63719' AND mp.goals > 0) as our_goalscorers,
+              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.assists || ')', ', ')
+               FROM match_players mp
+               WHERE mp.match_id = m.match_id AND mp.club_id = '63719' AND mp.assists > 0) as our_assisters,
+              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.goals || ')', ', ')
+               FROM match_players mp
+               WHERE mp.match_id = m.match_id AND mp.club_id = mc2.club_id AND mp.goals > 0) as opponent_goalscorers,
+              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.assists || ')', ', ')
+               FROM match_players mp
+               WHERE mp.match_id = m.match_id AND mp.club_id = mc2.club_id AND mp.assists > 0) as opponent_assisters
+            FROM matches m
+            JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = '63719'
+            JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id != '63719'
+            ORDER BY m.match_timestamp DESC
+          """)
+          (out / "matches" / "all.json").write_text(json.dumps({"success": True, "count": len(matches), "matches": matches}), encoding="utf-8")
+
+          # 2) Player rankings (pre-slice by position)
+          POS = ["all","ST","AM","DM","DF","GK"]
+          for pos in POS:
+            where_pos = {
+              "all": "",
+              "ST":  "AND assigned_position = 'ST'",
+              "AM":  "AND assigned_position = 'AM'",
+              "DM":  "AND assigned_position = 'DM'",
+              "GK":  "AND assigned_position = 'GK'",
+              "DF":  "AND assigned_position IN ('RB','LB','CB')",
+            }[pos]
+
+            query = f"""
+              SELECT
+                CASE WHEN '{pos.upper()}'='ALL' THEN NULL ELSE assigned_position END AS assigned_position,
+                player_id, player_name,
+                COUNT(*) AS matches_played,
+                SUM(CASE WHEN team_result IN (1,16385) THEN 1 ELSE 0 END) AS wins,
+                SUM(goals) AS total_goals,
+                SUM(assists) AS total_assists,
+                SUM(goals + assists) AS goal_contributions,
+                SUM(mom) AS motm_awards,
+                SUM(redcards) AS red_cards,
+                SUM(shots) AS total_shots,
+                SUM(passattempts) AS total_pass_attempts,
+                SUM(passesmade) AS total_passes_made,
+                SUM(tackleattempts) AS total_tackle_attempts,
+                SUM(tacklesmade) AS total_tackles_made,
+                SUM(saves) AS total_saves,
+                SUM(cleansheetsgk) AS clean_sheets_gk,
+                SUM(cleansheetsdef) AS clean_sheets_def,
+                ROUND(AVG(rating), 2) AS avg_rating,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(goals) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS goals_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(assists) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS assists_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(goals + assists) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS goal_contributions_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(shots) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS shots_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(passesmade) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS passes_made_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(tacklesmade) AS FLOAT)/COUNT(*) ELSE 0 END, 2) AS tackles_made_per_match,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(mom) AS FLOAT)/COUNT(*)*100 ELSE 0 END, 1) AS motm_rate,
+                ROUND(CASE WHEN SUM(passattempts)>0 THEN CAST(SUM(passesmade) AS FLOAT)/SUM(passattempts)*100 ELSE 0 END, 1) AS pass_success_rate,
+                ROUND(CASE WHEN SUM(tackleattempts)>0 THEN CAST(SUM(tacklesmade) AS FLOAT)/SUM(tackleattempts)*100 ELSE 0 END, 1) AS tackle_success_rate,
+                ROUND(CASE WHEN SUM(shots)>0 THEN CAST(SUM(goals) AS FLOAT)/SUM(shots)*100 ELSE 0 END, 1) AS shot_success_rate,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(cleansheetsdef) AS FLOAT)/COUNT(*)*100 ELSE 0 END, 1) AS def_clean_sheets_rate,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(cleansheetsgk) AS FLOAT)/COUNT(*)*100 ELSE 0 END, 1) AS gk_clean_sheets_rate,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(redcards) AS FLOAT)/COUNT(*)*100 ELSE 0 END, 1) AS red_cards_rate,
+                ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(CASE WHEN team_result IN (1,16385) THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 ELSE 0 END, 1) AS win_rate
+              FROM player_match_stats_view
+              WHERE club_id = '63719' {where_pos}
+              GROUP BY player_id, player_name{'' if pos=='all' else ', assigned_position'}
+              HAVING matches_played >= 1
+            """
+            rows = q(conn, query)
+            (out / "players" / f"rankings_{pos}.json").write_text(json.dumps({"success": True, "position_filter": pos, "count": len(rows), "players": rows}), encoding="utf-8")
+
+          # 3) Per-match detailed files (only for matches we listed)
+          import itertools
+          for m in matches:
+            mid = m["match_id"]
+            clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
+            try:
+              players = q(conn, """
+                SELECT * FROM player_match_stats_view 
+                WHERE match_id = ?
+                ORDER BY club_id, assigned_position, rating DESC
+              """, (mid,))
+            except sqlite3.OperationalError:
+              players = q(conn, """
+                SELECT * FROM match_players 
+                WHERE match_id = ?
+                ORDER BY club_id, rating DESC
+              """, (mid,))
+            aggregates = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
+            # Keep it simple: skip head-to-head for v1 (optional later)
+            p = out / "matches" / mid / "detailed.json"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps({"success": True, "match": m, "clubs": clubs, "players": players, "aggregates": aggregates}), encoding="utf-8")
+
+          conn.close()
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to Pages
+        uses: actions/deploy-pages@v4
