@@ -3,8 +3,8 @@ import json
 import sqlite3
 from datetime import datetime
 import time
-
 import os
+
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
 YOUR_CLUB_ID = '63719'
@@ -75,7 +75,7 @@ def match_exists(conn, match_id):
     return cursor.fetchone() is not None
 
 def insert_match_data(conn, match):
-    """Insert a single match and all related data"""
+    """Insert a single match and all related data using INSERT OR IGNORE"""
     match_id = match['matchId']
     
     if match_exists(conn, match_id):
@@ -84,9 +84,9 @@ def insert_match_data(conn, match):
     cursor = conn.cursor()
     
     try:
-        # 1. Insert into matches table
+        # 1. Insert into matches table (PRIMARY KEY prevents duplicates)
         cursor.execute("""
-            INSERT INTO matches (match_id, match_timestamp, time_ago_number, time_ago_unit, raw_json)
+            INSERT OR IGNORE INTO matches (match_id, match_timestamp, time_ago_number, time_ago_unit, raw_json)
             VALUES (?, ?, ?, ?, ?)
         """, (
             match_id,
@@ -96,10 +96,14 @@ def insert_match_data(conn, match):
             json.dumps(match)
         ))
         
+        # Check if match was actually inserted
+        if cursor.rowcount == 0:
+            return False
+        
         # 2. Process each club in the match
         for club_id, club_data in match['clubs'].items():
             cursor.execute("""
-                INSERT INTO match_clubs (
+                INSERT OR IGNORE INTO match_clubs (
                     match_id, club_id, club_name, date, game_number, goals, goals_against,
                     losses, match_type, result, score, season_id, team_id, ties, 
                     winner_by_dnf, wins, region_id, stad_name, kit_id, crest_asset_id, custom_kit_json
@@ -127,6 +131,7 @@ def insert_match_data(conn, match):
                 json.dumps(club_data['details']['customKit'])
             ))
             
+            # Update clubs table
             cursor.execute("""
                 INSERT OR REPLACE INTO clubs (club_id, club_name, region_id, team_id, stad_name, crest_asset_id, last_seen)
                 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -143,7 +148,7 @@ def insert_match_data(conn, match):
         for club_id, players in match.get('players', {}).items():
             for player_id, player_data in players.items():
                 cursor.execute("""
-                    INSERT INTO match_players (
+                    INSERT OR IGNORE INTO match_players (
                         match_id, club_id, player_id, player_name, assists, cleansheetsany, 
                         cleansheetsdef, cleansheetsgk, goals, goalsconceded, losses, mom,
                         namespace, passattempts, passesmade, pos, rating, realtimegame,
@@ -179,6 +184,7 @@ def insert_match_data(conn, match):
                     player_data.get('vprohackreason')
                 ))
                 
+                # Update players table
                 cursor.execute("""
                     INSERT OR REPLACE INTO players (player_id, player_name, last_position, last_club_id, last_seen)
                     VALUES (?, ?, ?, ?, datetime('now'))
@@ -192,7 +198,7 @@ def insert_match_data(conn, match):
         # 4. Process aggregates
         for club_id, agg_data in match.get('aggregate', {}).items():
             cursor.execute("""
-                INSERT INTO match_aggregates (
+                INSERT OR IGNORE INTO match_aggregates (
                     match_id, club_id, assists, cleansheetsany, cleansheetsdef, cleansheetsgk,
                     goals, goalsconceded, losses, mom, namespace, passattempts, passesmade,
                     pos, rating, realtimegame, realtimeidle, redcards, saves, score, shots,
@@ -231,7 +237,7 @@ def insert_match_data(conn, match):
         
     except Exception as e:
         conn.rollback()
-        print(f"    Error inserting match {match_id}: {e}")
+        print(f"    ⚠️ Error inserting match {match_id}: {e}")
         return False
 
 def main():
@@ -248,30 +254,30 @@ def main():
     
     # Fetch from each endpoint
     for endpoint in ENDPOINTS:
-        print(f"\nFetching {endpoint['name']}...")
+        print(f"\n📡 Fetching {endpoint['name']}...")
         matches = fetch_matches_from_api(endpoint['name'], endpoint['url'])
         
         if not matches:
-            print(f"  No data fetched for {endpoint['name']}")
+            print(f"  ❌ No data fetched for {endpoint['name']}")
             continue
         
         all_matches_count += len(matches)
         new_matches = 0
         existing_matches = 0
         
-        print(f"  Processing {len(matches)} matches...")
+        print(f"  📝 Processing {len(matches)} matches...")
         for match in matches:
             if insert_match_data(conn, match):
                 new_matches += 1
-                print(f"    ✓ Match {match['matchId']} added")
+                print(f"    ✅ Match {match['matchId']} added")
             else:
                 existing_matches += 1
-                print(f"    - Match {match['matchId']} already exists")
+                print(f"    ⏭️ Match {match['matchId']} already exists")
         
         total_new_matches += new_matches
         total_existing_matches += existing_matches
         
-        print(f"  {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
+        print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
     
     # Log the fetch
     cursor = conn.cursor()
@@ -285,18 +291,20 @@ def main():
     ))
     
     conn.commit()
+    
+    # Get total matches in database
+    cursor.execute("SELECT COUNT(*) as count FROM matches")
+    total_in_db = cursor.fetchone()['count']
+    
     conn.close()
     
     print("\n" + "="*50)
-    print("OVERALL SUMMARY:")
+    print("📈 OVERALL SUMMARY:")
     print(f"  Total matches found: {all_matches_count}")
     print(f"  New matches added: {total_new_matches}")
     print(f"  Existing matches skipped: {total_existing_matches}")
+    print(f"  Total matches in database: {total_in_db}")
     print("="*50)
-    
-    # Update log file
-    with open('fetch_log.txt', 'a') as f:
-        f.write(f"\n{datetime.now()} - Found: {all_matches_count}, Added: {total_new_matches}, Skipped: {total_existing_matches} ")
 
 if __name__ == "__main__":
     main()
