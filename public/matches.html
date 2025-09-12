@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pro Clubs - Matches</title>
+<style>
+  :root{
+    --bg:#f3f4f6; --card:#ffffff; --text:#0f172a; --muted:#475569; --line:#e5e7eb;
+    --rail:#facc15; --rail-dark:#f59e0b; --active-bg:#eef2ff; --active-br:#c7d2fe; --active-tx:#1e40af;
+    --score:#0b1320; --win:#16a34a; --loss:#dc2626; --draw:#f59e0b;
+    --navy:#0f172a; --pitch:#e8f5e9;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  body::after{content:"";display:block;height:120px}
+
+  /* Header / Nav */
+  header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
+  .bar{max-width:1500px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:10px 14px}
+  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9}
+  .brand a{color:inherit;text-decoration:none}
+  nav{display:flex;gap:6px}
+  nav a{color:#334155;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
+  nav a[aria-current="page"]{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx)}
+  .spacer{flex:1}
+
+  /* Page */
+  .wrap{max-width:840px;margin:14px auto 100px;padding:0 12px}
+
+  /* Filters */
+  .filters{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:end;margin:2px 0 12px}
+  .filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  .filters input[type="date"]{background:#fff;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+  .filters button{background:#fff;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
+  .filters button:hover{background:#f9fafb}
+  .filters .info{font-size:12px;color:var(--muted)}
+
+  /* Summary */
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:12px 0}
+  .summary-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+  .summary-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .summary-value{font-size:20px;font-weight:800;margin-top:4px}
+  .summary-value.win{color:var(--win)} .summary-value.draw{color:var(--draw)} .summary-value.loss{color:var(--loss)}
+
+  /* Pager */
+  .pager{display:flex;gap:6px;align-items:center;justify-content:flex-start;margin:10px 0 8px}
+  .pager button{border:1px solid var(--line);background:#fff;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+  .pager button[disabled]{opacity:.5;cursor:not-allowed}
+  .pager .page-btn.active{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx);font-weight:600}
+  .pager .info{font-size:12px;color:var(--muted);margin-left:8px}
+
+  /* Boards / Cards */
+  .group-meta{font-size:12px;color:var(--muted);margin:4px 2px 6px}
+  .board{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 6px rgba(15,23,42,.05);overflow:hidden}
+  .board::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:linear-gradient(180deg,var(--rail),var(--rail-dark))}
+  .item + .item{border-top:1px solid var(--line)}
+  .item{cursor:pointer;transition:background-color .2s}
+  .item:hover{background:#f8fafc}
+
+  .row{display:grid;grid-template-columns:1fr auto auto 8px auto auto 1fr;align-items:center;gap:12px;padding:12px 16px 6px 20px}
+  .team{font-size:clamp(15px,2.6vw,18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;top:2px;line-height:1}
+  .left.team{text-align:right;padding-right:6px}
+  .right.team{text-align:left;padding-left:6px}
+  .crest{width:28px;height:28px;object-fit:contain;align-self:center;transform:translateY(3px)}
+  .crest.left{margin-right:10px} .crest.right{margin-left:10px}
+  .crest.placeholder{background:#cbd5e1;border-radius:50%;border:1px solid #cbd5e1;display:inline-block}
+  .score{font-weight:900;font-size:clamp(26px,4vw,30px);color:var(--score)}
+  .row.res-W .score{color:var(--win)}
+  .row.res-L .score{color:var(--loss)}
+  .row.res-D .score{color:var(--draw)}
+  .pipe{width:2px;height:18px;background:var(--rail);border-radius:2px;justify-self:center}
+
+  .match-details{padding:0 16px 10px 20px;display:grid;grid-template-columns:1fr auto 1fr;gap:14px;font-size:13px;font-weight:600;font-family:"Segoe UI Rounded","SF Pro Rounded",system-ui,sans-serif;color:var(--text);align-items:start}
+  .details-left{text-align:right} .details-right{text-align:left} .details-center{text-align:center}
+  .detail-label{font-weight:600;margin-bottom:3px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);display:block}
+  .detail-value{line-height:1.4;white-space:pre-wrap;word-break:break-word;margin-bottom:6px}
+  .date{text-align:center;padding:0 16px 12px 20px;font-size:12px;color:var(--muted)}
+
+  .empty,.error{text-align:center;padding:12px 10px;border-radius:10px;background:#fff;border:1px dashed var(--line);margin-top:10px;font-size:12px}
+  .error{border-color:#fecaca;background:#fff5f5}
+
+  /* Modal */
+  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--card);border-radius:14px;width:100%;max-width:1080px;max-height:90vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-header{background:#1e293b;color:#fff;padding:16px 20px;position:relative}
+  .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px}
+  .modal-close:hover{opacity:.85}
+  .modal-match-info{text-align:center;font-size:12px;opacity:.85;margin-bottom:8px}
+  .match-score-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;margin-bottom:8px}
+  .modal-team{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .modal-team.left{justify-content:flex-end} .modal-team.right{justify-content:flex-start}
+  .modal-crest{width:26px;height:26px;object-fit:contain}
+  .modal-score-section{text-align:center}
+  .modal-final-score{font-size:32px;font-weight:800}
+  .ms-win{color:var(--win)} .ms-loss{color:var(--loss)} .ms-draw{color:var(--draw)}
+
+  .match-events{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;margin-top:6px}
+  .events-left{text-align:right}.events-right{text-align:left}
+  .events-center{text-align:center;font-size:12px;opacity:.7}
+  .event-line{margin-bottom:2px;font-size:13px}
+
+  .modal-content{overflow-y:auto;max-height:calc(90vh - 180px)}
+  .tab-navigation{display:flex;background:#f1f5f9;border-bottom:1px solid var(--line)}
+  .tab-button{flex:1;padding:10px 16px;background:none;border:none;font-size:14px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent}
+  .tab-button.active{background:#fff;border-bottom-color:var(--rail);color:var(--active-tx)}
+  .tab-button:hover:not(.active){background:#e2e8f0}
+  .tab-content{display:none;padding:18px} .tab-content.active{display:block}
+
+  /* Formation / Pitch (clean background, fixed badges) */
+  .lineups-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .formation-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+  .formation-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .team-title{font-weight:700}
+  .formation-label{font-size:12px;color:var(--muted)}
+  .pitch{position:relative;background:var(--pitch);border:1px solid var(--line);border-radius:10px;height:480px;overflow:hidden}
+
+  .slot{position:absolute; /* exact field coordinate anchor */
+        width:0;height:0;}
+  .badge{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;
+         display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
+         transform:translate(-50%,-50%);}
+  .badge.home{background:var(--rail);color:#111827}
+  .badge.away{background:#111827;color:#fff}
+  .badge.bot{background:#cbd5e1;color:#334155}
+  .player-label{position:absolute;left:0;top:26px;transform:translateX(-50%);font-size:12px;
+                white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;text-align:center}
+
+  /* Stats bars (kept) */
+  .bars{display:grid;gap:18px}
+  .bar-block{display:grid;gap:6px}
+  .bar-title{font-size:14px;font-weight:600;text-align:center}
+  .bar-row{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:12px}
+  .bar-num{font-weight:700}
+  .track{position:relative;height:12px;background:#f1f5f9;border-radius:8px;overflow:hidden}
+  .bar-left{position:absolute;left:0;top:0;bottom:0;background:var(--rail)}
+  .bar-right{position:absolute;right:0;top:0;bottom:0;background:#0f172a}
+
+  @media (max-width:560px){
+    .wrap{max-width:100%}
+    .row{grid-template-columns:1fr auto auto 6px auto auto 1fr;padding:10px 12px 4px 16px;gap:10px}
+    .team{font-size:clamp(14px,4.6vw,17px)}
+    .score{font-size:clamp(24px,6vw,28px)}
+    .crest{width:24px;height:24px;transform:translateY(1px)}
+    .date{padding:0 12px 10px 16px}
+    .match-details{padding:0 12px 8px 16px;grid-template-columns:1fr;gap:10px}
+    .details-left,.details-right,.details-center{text-align:left}
+    .modal{margin:8px;max-width:calc(100% - 16px)}
+    .lineups-grid{grid-template-columns:1fr;gap:16px}
+    .match-score-header{grid-template-columns:1fr;gap:10px;text-align:center}
+    .match-events{grid-template-columns:1fr;gap:6px;text-align:center}
+    .events-left,.events-right{text-align:center}
+    .pitch{height:380px}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand"><a href="home.html">Rayo Vilkins FC</a></div>
+      <div class="spacer"></div>
+      <nav>
+        <a href="matches.html" aria-current="page">Matches</a>
+        <a href="stats.html">Stats</a>
+		<a href="wheel.html">Wheel</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="filters">
+      <label>From <input type="date" id="fromDate" /></label>
+      <label>To <input type="date" id="toDate" /></label>
+      <button id="apply">Apply</button>
+      <button id="reset">Reset</button>
+      <span id="rangeInfo" class="info"></span>
+    </div>
+
+    <div id="summary" class="summary" style="display:none;"></div>
+
+    <!-- Pager sits above results -->
+    <div id="pager" class="pager" style="display:none;"></div>
+
+    <div id="status" class="info">Loading matches…</div>
+    <div id="boards"></div>
+  </div>
+
+  <!-- Modal -->
+  <div id="matchModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <button class="modal-close">&times;</button>
+        <div id="modalMatchInfo"></div>
+      </div>
+      <div class="modal-content">
+        <div class="tab-navigation">
+          <button class="tab-button active" data-tab="lineups">Line-ups</button>
+          <button class="tab-button" data-tab="stats">Match Stats</button>
+          <button class="tab-button" data-tab="h2h">Head-to-head</button>
+        </div>
+        <div id="lineups" class="tab-content active"></div>
+        <div id="stats" class="tab-content"></div>
+        <div id="h2h" class="tab-content"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const OUR_CLUB_ID = '63719';
+  const API_BASE = '';
+
+  const CREST_BASE = 'https://eafc24.content.easports.com/fifa/fltOnlineAssets/24B23FDE-7835-41C2-87A2-F453DFDB2E82/2024/fcweb/crests/256x256/l';
+  const crestUrl = (teamId) => `${CREST_BASE}${parseInt(teamId)||1}.png`;
+
+  function crestEl(teamId, name, side){
+    const img = document.createElement('img');
+    img.className = 'crest ' + (side||'');
+    img.src = crestUrl(teamId);
+    img.alt = '';
+    if(name) img.setAttribute('aria-label', name);
+    img.onerror = function(){
+      const ph = document.createElement('span');
+      ph.className = 'crest placeholder ' + (side||'');
+      ph.setAttribute('role','img');
+      if(name) ph.setAttribute('aria-label', name);
+      img.replaceWith(ph);
+    };
+    return img;
+  }
+
+  const el = {
+    from: document.getElementById('fromDate'),
+    to: document.getElementById('toDate'),
+    apply: document.getElementById('apply'),
+    reset: document.getElementById('reset'),
+    info: document.getElementById('rangeInfo'),
+    boards: document.getElementById('boards'),
+    status: document.getElementById('status'),
+    summary: document.getElementById('summary'),
+    pager: document.getElementById('pager'),
+    modal: document.getElementById('matchModal'),
+    modalInfo: document.getElementById('modalMatchInfo'),
+  };
+
+  const toISODateLocal = (d) => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  function defaultDates(){ const t=new Date(); const past=new Date(t); past.setDate(t.getDate()-30); return {from:toISODateLocal(past), to:toISODateLocal(t)}; }
+  const startUnix = (d) => Math.floor(new Date(d+'T00:00:00').getTime()/1000);
+  const endUnix   = (d) => Math.floor(new Date(d+'T23:59:59').getTime()/1000);
+  function h(tag, attrs={}, ...kids){ const n=document.createElement(tag); for(const [k,v] of Object.entries(attrs||{})){ if(k==='class') n.className=v; else if(k==='html') n.innerHTML=v; else n.setAttribute(k,v); } kids.flat().filter(Boolean).forEach(k=> n.appendChild(typeof k==='string'? document.createTextNode(k): k)); return n; }
+  function fmtDate(sec){ const d=new Date(sec*1000); return d.toLocaleString([], {year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'}); }
+
+  // Modal open/close
+  function openModal(matchId){ el.modal.classList.add('show'); loadMatchDetails(matchId); }
+  function closeModal(){ el.modal.classList.remove('show'); }
+  el.modal.addEventListener('click', (e)=>{ if(e.target===el.modal) closeModal(); });
+  document.querySelector('.modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('.tab-button').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
+  function switchTab(tab){ document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.querySelector(`[data-tab="${tab}"]`).classList.add('active'); document.getElementById(tab).classList.add('active'); }
+
+  async function getJSON(path){
+    const res = await fetch(`${API_BASE}${path}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // -------- MATCH DETAILS (modal) ----------
+  async function loadMatchDetails(matchId) {
+    try {
+      const response = await getJSON(`api/matches/${matchId}/detailed.json`);
+      const { match, clubs = [], players = [], aggregates = [], head_to_head = {} } = response;
+
+      renderMatchHeader(match, clubs, players);
+      renderLineups(clubs, players);     // updated formation rendering
+      renderMatchStats(Array.isArray(aggregates) ? aggregates : []);
+
+      const ourIsClub1 = (clubs?.[0]?.club_id === OUR_CLUB_ID);
+      const s = head_to_head.summary || { played: 0, club1_wins: 0, draws: 0, club2_wins: 0 };
+      const summary = {
+        total_played: s.played || 0,
+        our_wins: ourIsClub1 ? (s.club1_wins || 0) : (s.club2_wins || 0),
+        draws: s.draws || 0,
+        our_losses: ourIsClub1 ? (s.club2_wins || 0) : (s.club1_wins || 0),
+      };
+      const mapResultToOur = (club1_result) => {
+        if (club1_result === 4) return 4;
+        if (club1_result === 1 || club1_result === 16385) return ourIsClub1 ? 1 : 2;
+        if (club1_result === 2 || club1_result === 10)   return ourIsClub1 ? 2 : 1;
+        return club1_result ?? 0;
+      };
+      const h2hMatches = (head_to_head.matches || []).map(m => ({
+        match_timestamp: m.match_timestamp,
+        our_goals:       ourIsClub1 ? m.club1_goals : m.club2_goals,
+        opponent_goals:  ourIsClub1 ? m.club2_goals : m.club1_goals,
+        our_result:      mapResultToOur(m.club1_result),
+      }));
+      renderHeadToHead(summary, h2hMatches);
+    } catch (error) {
+      console.error('Error loading match details:', error);
+      el.modalInfo.innerHTML = '<div class="error">Failed to load match details</div>';
+    }
+  }
+
+  function renderMatchHeader(match, clubs, players) {
+    const ourClub = clubs.find(c => c.club_id === OUR_CLUB_ID);
+    const oppClub = clubs.find(c => c.club_id !== OUR_CLUB_ID);
+    if (!ourClub || !oppClub) return;
+
+    const ourGoals = players.filter(p => p.club_id === OUR_CLUB_ID && p.goals > 0)
+      .map(p => `${p.player_name} (${p.goals})`).join(', ');
+    const ourAssists = players.filter(p => p.club_id === OUR_CLUB_ID && p.assists > 0)
+      .map(p => `${p.player_name} (${p.assists})`).join(', ');
+    const oppGoals = players.filter(p => p.club_id !== OUR_CLUB_ID && p.goals > 0)
+      .map(p => `${p.player_name} (${p.goals})`).join(', ');
+    const oppAssists = players.filter(p => p.club_id !== OUR_CLUB_ID && p.assists > 0)
+      .map(p => `${p.player_name} (${p.assists})`).join(', ');
+
+    const result = ourClub.goals>oppClub.goals ? 'ms-win' : (ourClub.goals<oppClub.goals ? 'ms-loss' : 'ms-draw');
+
+    const leftCrest  = crestUrl(ourClub.team_id || ourClub.teamId || 480);
+    const rightCrest = crestUrl(oppClub.team_id || oppClub.teamId || 1);
+
+    el.modalInfo.innerHTML = `
+      <div class="modal-match-info">${fmtDate(match.match_timestamp)}</div>
+      <div class="match-score-header">
+        <div class="modal-team left">
+          <span>${ourClub.club_name}</span>
+          <img class="modal-crest" src="${leftCrest}" alt="">
+        </div>
+        <div class="modal-score-section">
+          <div class="modal-final-score ${result}">${ourClub.goals} - ${oppClub.goals}</div>
+        </div>
+        <div class="modal-team right">
+          <img class="modal-crest" src="${rightCrest}" alt="">
+          <span>${oppClub.club_name}</span>
+        </div>
+      </div>
+      <div class="match-events">
+        <div class="events-left">
+          ${ourGoals   ? `<div class="event-line">⚽ ${ourGoals}</div>`   : ''}
+          ${ourAssists ? `<div class="event-line">🎯 ${ourAssists}</div>` : ''}
+        </div>
+        <div class="events-center"><div>FT</div></div>
+        <div class="events-right">
+          ${oppGoals   ? `<div class="event-line">⚽ ${oppGoals}</div>`   : ''}
+          ${oppAssists ? `<div class="event-line">🎯 ${oppAssists}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  /* -------------------- FORMATION RENDERING -------------------- */
+  function renderLineups(clubs, players) {
+    const our = players.filter(p=>p.club_id===OUR_CLUB_ID);
+    const opp = players.filter(p=>p.club_id!==OUR_CLUB_ID);
+    const ourClub = clubs.find(c=>c.club_id===OUR_CLUB_ID);
+    const oppClub = clubs.find(c=>c.club_id!==OUR_CLUB_ID);
+
+    function byRole(ps, role){ return ps.filter(p => (p.assigned_position||'').toUpperCase()===role); }
+
+    function build(teamPlayers, teamName, side){
+      const gks = byRole(teamPlayers,'GK');
+      const lbs = byRole(teamPlayers,'LB');
+      const rbs = byRole(teamPlayers,'RB');
+      const cbs = byRole(teamPlayers,'CB');
+      const dms = byRole(teamPlayers,'DM');
+      const ams = byRole(teamPlayers,'AM');
+      const sts = byRole(teamPlayers,'ST');
+
+      const twoDM = dms.length >= 2;
+      const formationName = twoDM ? '4-2-3-1' : '4-1-4-1';
+
+      /* Coordinates with GK at TOP and ST at BOTTOM */
+      const base = [];
+      base.push({role:'GK', x:50, y:8});
+
+base.push({role:'LB', x:20, y:26});
+base.push({role:'CB', x:40, y:26});
+base.push({role:'CB', x:60, y:26});
+base.push({role:'RB', x:80, y:26});
+
+if (twoDM) {
+  base.push({role:'DM', x:40, y:46});
+  base.push({role:'DM', x:60, y:46});
+
+  base.push({role:'AM', x:30, y:66});
+  base.push({role:'AM', x:50, y:66});
+  base.push({role:'AM', x:70, y:66});
+} else {
+  base.push({role:'DM', x:50, y:46});
+
+  base.push({role:'AM', x:20, y:66});
+  base.push({role:'AM', x:40, y:66});
+  base.push({role:'AM', x:60, y:66});
+  base.push({role:'AM', x:80, y:66});
+}
+
+base.push({role:'ST', x:50, y:86});
+
+      const pop = (arr)=>arr.length ? arr.shift() : null;
+
+      function pick(slot){
+        let p=null;
+        if(slot.role==='GK'){ p=pop(gks); }
+        else if(slot.role==='LB'){ p=pop(lbs); }
+        else if(slot.role==='RB'){ p=pop(rbs); }
+        else if(slot.role==='CB'){ p=pop(cbs); }
+        else if(slot.role==='DM'){ p=pop(dms); }
+        else if(slot.role==='AM'){ p=pop(ams); }
+        else if(slot.role==='ST'){ p=pop(sts); }
+        if(!p) return {isBot:true,name:'Bot',rating:'—'};
+        return {isBot:false,name:p.player_name||'—',rating:(p.rating? Number(p.rating).toFixed(1):'—')};
+      }
+
+      const dots = base.map(s=>{
+        const pl = pick(s);
+        const badgeClass = pl.isBot ? 'badge bot' : ('badge ' + (side==='home' ? 'home':'away'));
+        return `
+          <div class="slot" style="left:${s.x}%; top:${s.y}%">
+            <div class="${badgeClass}">${pl.rating}</div>
+            <div class="player-label">${pl.name}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="formation-card">
+          <div class="formation-top">
+            <div class="team-title">${teamName}</div>
+            <div class="formation-label">${formationName}</div>
+          </div>
+          <div class="pitch">
+            ${dots}
+          </div>
+        </div>
+      `;
+    }
+
+    document.getElementById('lineups').innerHTML = `
+      <div class="lineups-grid">
+        ${build(our, ourClub?.club_name || 'Our Team', 'home')}
+        ${build(opp, oppClub?.club_name || 'Opponent', 'away')}
+      </div>
+    `;
+  }
+
+  /* -------------------- STATS (bars) -------------------- */
+  function makeBar(label, leftValue, rightValue, leftBasis, rightBasis){
+    let leftPct, rightPct;
+    if (typeof leftBasis === 'number' && typeof rightBasis === 'number') {
+      leftPct  = Math.max(0, Math.min(100, leftBasis));
+      rightPct = Math.max(0, Math.min(100, rightBasis));
+    } else {
+      const total = Math.max(
+        (Number(String(leftValue).replace('%',''))||0) +
+        (Number(String(rightValue).replace('%',''))||0), 1);
+      leftPct  = (Number(String(leftValue).replace('%',''))||0)/total*100;
+      rightPct = (Number(String(rightValue).replace('%',''))||0)/total*100;
+    }
+    return `
+      <div class="bar-block">
+        <div class="bar-title">${label}</div>
+        <div class="bar-row">
+          <div class="bar-num">${leftValue}</div>
+          <div class="track">
+            <div class="bar-left"  style="width:${leftPct}%"></div>
+            <div class="bar-right" style="width:${rightPct}%"></div>
+          </div>
+          <div class="bar-num" style="text-align:right">${rightValue}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMatchStats(aggregates) {
+    const our = aggregates.find(a => a.club_id === OUR_CLUB_ID);
+    const opp = aggregates.find(a => a.club_id !== OUR_CLUB_ID);
+    if (!our || !opp) {
+      document.getElementById('stats').innerHTML = '<div class="error">Match statistics not available</div>';
+      return;
+    }
+
+    const shotsO = our.shots||0,   shotsT = opp.shots||0;
+    const paO    = our.passattempts||0, paT = opp.passattempts||0;
+    const pmO    = our.passesmade||0,   pmT = opp.passesmade||0;
+    const taO    = our.tackleattempts||0, taT = opp.tackleattempts||0;
+    const tmO    = our.tacklesmade||0,   tmT = opp.tacklesmade||0;
+
+    const psO = paO>0 ? Math.round((pmO/paO)*100) : 0;
+    const psT = paT>0 ? Math.round((pmT/paT)*100) : 0;
+    const tsO = taO>0 ? Math.round((tmO/taO)*100) : 0;
+    const tsT = taT>0 ? Math.round((tmT/taT)*100) : 0;
+
+    const rows = [
+      makeBar('Shots', shotsO, shotsT),
+      makeBar('Passes Attempted', paO, paT),
+      makeBar('Passes Completed', pmO, pmT),
+      makeBar('Pass Success %', `${psO}%`, `${psT}%`, psO, psT),
+      makeBar('Tackles Attempted', taO, taT),
+      makeBar('Tackles Completed', tmO, tmT),
+      makeBar('Tackle Success %', `${tsO}%`, `${tsT}%`, tsO, tsT),
+    ];
+    document.getElementById('stats').innerHTML = `<div class="bars">${rows.join('')}</div>`;
+  }
+
+  function renderHeadToHead(summary, matches) {
+    const totalPlayed = summary.total_played || 0;
+    const ourWins = summary.our_wins || 0;
+    const draws = summary.draws || 0;
+    const ourLosses = summary.our_losses || 0;
+
+    document.getElementById('h2h').innerHTML = `
+      <div class="h2h-summary" style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px">
+        <h3 style="text-align:center;margin:0 0 10px 0;font-size:16px">Previous Meetings</h3>
+        <div class="h2h-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center">
+          <div><div class="h2h-stat-label">Played</div><div class="h2h-stat-value">${totalPlayed}</div></div>
+          <div><div class="h2h-stat-label">Won</div><div class="h2h-stat-value wins">${ourWins}</div></div>
+          <div><div class="h2h-stat-label">Draw</div><div class="h2h-stat-value draws">${draws}</div></div>
+          <div><div class="h2h-stat-label">Lost</div><div class="h2h-stat-value losses">${ourLosses}</div></div>
+        </div>
+      </div>
+      ${totalPlayed>0 ? `
+        <div class="h2h-matches">
+          <h4 style="margin:0 0 8px 0">Previous Scores</h4>
+          ${matches.slice(0,5).map(m=>{
+            const rc = (m.our_result===1||m.our_result===16385)?'win':(m.our_result===4?'draw':'loss');
+            return `
+              <div class="h2h-match" style="display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
+                <div></div>
+                <div class="h2h-score ${rc}">Rayo Vilkins ${m.our_goals} - ${m.opponent_goals} Opponent</div>
+                <div></div>
+                <div class="h2h-match-date" style="font-size:12px;color:var(--muted)">${fmtDate(m.match_timestamp)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>` : '<div style="text-align:center;color:var(--muted);margin-top:10px">No previous meetings found</div>'}
+    `;
+  }
+
+  /* -------------------- MATCH LIST (pagination) -------------------- */
+  let filteredMatches = [];
+  let currentPage = 1;
+  const pageSize = 6;
+
+  function buildItem(match){
+    const item = h('div',{class:'item'});
+    item.addEventListener('click', ()=>openModal(match.match_id));
+
+    const L = parseInt(match.our_goals)||0;
+    const R = parseInt(match.opponent_goals)||0;
+    const rowClass = match.result==='W'?'res-W':(match.result==='L'?'res-L':'res-D');
+
+    const row = h('div',{class:`row ${rowClass}`});
+    const lName = h('div',{class:'team left'}, match.our_club_name || 'Rayo Vilkins');
+    const lCrest = crestEl(match.our_team_id || 480, match.our_club_name,'left');
+    const lScore = h('div',{class:'score'}, String(L));
+    const pipe   = h('div',{class:'pipe'});
+    const rScore = h('div',{class:'score'}, String(R));
+    const rCrest = crestEl(match.opponent_team_id || 1, match.opponent_club_name,'right');
+    const rName  = h('div',{class:'team right'}, match.opponent_club_name || 'Unknown');
+    row.append(lName,lCrest,lScore,pipe,rScore,rCrest,rName);
+    item.appendChild(row);
+
+    const showOurGoals = !!match.our_goalscorers;
+    const showOurAssists = !!match.our_assisters;
+    const showOppGoals = !!match.opponent_goalscorers;
+    const showOppAssists = !!match.opponent_assisters;
+
+    if (showOurGoals || showOurAssists || showOppGoals || showOppAssists){
+      const details = h('div',{class:'match-details'});
+      const leftCol = h('div',{class:'details-left'});
+      if (showOurGoals)    leftCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'⚽ GOALS'),   h('div',{class:'detail-value'}, match.our_goalscorers)));
+      if (showOurAssists)  leftCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'🎯 ASSISTS'), h('div',{class:'detail-value'}, match.our_assisters)));
+      const centerCol = h('div',{class:'details-center'});
+      const rightCol = h('div',{class:'details-right'});
+      if (showOppGoals)    rightCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'⚽ GOALS'),   h('div',{class:'detail-value'}, match.opponent_goalscorers)));
+      if (showOppAssists)  rightCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'🎯 ASSISTS'), h('div',{class:'detail-value'}, match.opponent_assisters)));
+      details.append(leftCol,centerCol,rightCol);
+      item.appendChild(details);
+    }
+
+    item.appendChild(h('div',{class:'date'}, fmtDate(match.match_timestamp)));
+    return item;
+  }
+
+  function renderSummary(matches) {
+    const stats = {
+      played: matches.length,
+      wins: matches.filter(m=>m.result==='W').length,
+      draws: matches.filter(m=>m.result==='D').length,
+      losses: matches.filter(m=>m.result==='L').length,
+      gf: matches.reduce((s,m)=>s+(parseInt(m.our_goals)||0),0),
+      ga: matches.reduce((s,m)=>s+(parseInt(m.opponent_goals)||0),0),
+    };
+    const box = el.summary;
+    box.innerHTML = '';
+    const card = (label,val,cls='') =>
+      h('div',{class:'summary-card'},
+        h('div',{class:'summary-label'},label),
+        h('div',{class:`summary-value${cls?' '+cls:''}`}, String(val))
+      );
+    box.append(card('Played',stats.played));
+    box.append(card('Wins',stats.wins,'win'));
+    box.append(card('Draws',stats.draws,'draw'));
+    box.append(card('Losses',stats.losses,'loss'));
+    box.append(card('GF',stats.gf));
+    box.append(card('GA',stats.ga));
+    box.style.display='grid';
+  }
+
+  function paginate(data, page, size){
+    const total = data.length;
+    const pages = Math.max(1, Math.ceil(total/size));
+    const p = Math.min(Math.max(1,page), pages);
+    const start = (p-1)*size;
+    const end = start + size;
+    return { page:p, pages, total, slice: data.slice(start,end) };
+  }
+
+  function renderPager(total, page, pages){
+    if (pages <= 1){ el.pager.style.display='none'; el.pager.innerHTML=''; return; }
+    el.pager.style.display='flex';
+    const makeBtn = (label, disabled, handler, extra='') => {
+      const b = document.createElement('button');
+      b.innerText = label;
+      b.disabled = !!disabled;
+      b.className = extra;
+      b.addEventListener('click', handler);
+      return b;
+    };
+    el.pager.innerHTML = '';
+    el.pager.append(makeBtn('« Prev', page===1, ()=>goTo(page-1)));
+    const windowSize = 7;
+    let start = Math.max(1, page - Math.floor(windowSize/2));
+    let end = Math.min(pages, start + windowSize - 1);
+    if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
+    for(let i=start;i<=end;i++){
+      el.pager.append(makeBtn(String(i), false, ()=>goTo(i), 'page-btn'+(i===page?' active':'')));
+    }
+    el.pager.append(
+      makeBtn('Next »', page===pages, ()=>goTo(page+1)),
+      (()=>{
+        const span=document.createElement('span');
+        span.className='info';
+        span.textContent=`Page ${page} of ${pages} (${total} matches)`;
+        return span;
+      })()
+    );
+  }
+
+  function renderPage(){
+    const {page,pages,total,slice} = paginate(filteredMatches, currentPage, pageSize);
+
+    el.boards.innerHTML = '';
+    const groups = new Map();
+    for(const m of slice){
+      const mt = m.match_type==1?'League Matches'
+             : m.match_type==3?'Playoff Matches'
+             : m.match_type==9?'Cup Matches'
+             : 'Friendly Matches';
+      if(!groups.has(mt)) groups.set(mt, []);
+      groups.get(mt).push(m);
+    }
+    renderPager(total, page, pages);
+    for(const [mt,list] of groups.entries()){
+      el.boards.appendChild(h('div',{class:'group-meta'}, `${mt} - ${list.length} match${list.length>1?'es':''}`));
+      const board = h('section',{class:'board'});
+      list.forEach(m=>board.appendChild(buildItem(m)));
+      el.boards.appendChild(board);
+    }
+  }
+
+  function goTo(p){ currentPage = p; renderPage(); }
+
+  async function load(){
+    const fv = el.from.value, tv = el.to.value;
+    if(!fv || !tv){ el.status.textContent='Select a valid date range.'; return; }
+    if(new Date(fv) > new Date(tv)){ el.status.textContent='"From" must be before "To".'; return; }
+
+    el.info.textContent = `Showing matches from ${fv} to ${tv}`;
+    el.status.textContent = 'Loading matches…';
+    el.boards.innerHTML = '';
+    el.summary.style.display = 'none';
+    el.pager.style.display = 'none';
+    currentPage = 1;
+
+    try{
+      const response = await getJSON('api/matches/all.json');
+      const matches  = response.matches || [];
+      const fromU = startUnix(fv), toU = endUnix(tv);
+      const inRange = matches.filter(m => m.match_timestamp >= fromU && m.match_timestamp <= toU)
+                             .sort((a,b)=> b.match_timestamp - a.match_timestamp);
+      if(!inRange.length){ el.status.innerHTML = '<div class="empty">No matches in this date range.</div>'; return; }
+
+      renderSummary(inRange);
+      filteredMatches = inRange;
+      el.status.textContent = '';
+      renderPage();
+    }catch(e){
+      console.error(e);
+      el.status.innerHTML = `<div class="error">Could not reach your API – ${e.message}</div>`;
+    }
+  }
+
+  // Init
+  const {from,to} = defaultDates(); el.from.value=from; el.to.value=to;
+  el.apply.addEventListener('click', load);
+  el.reset.addEventListener('click', ()=>{ const d=defaultDates(); el.from.value=d.from; el.to.value=d.to; load(); });
+  load();
+})();
+</script>
+</body>
+</html>
