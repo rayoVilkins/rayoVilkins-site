@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pro Clubs - Player Stats</title>
+<style>
+  :root{
+    --bg: #f3f4f6;      /* gray-100 */
+    --card: #ffffff;    /* white */
+    --text: #0f172a;    /* slate-900 */
+    --muted:#475569;    /* slate-600 */
+    --line: #e5e7eb;    /* gray-200 */
+    --rail: #facc15;    /* amber-400 */
+    --rail-dark:#f59e0b;/* amber-500 */
+    --active-bg:#eef2ff;/* indigo-100 */
+    --active-br:#c7d2fe;/* indigo-200 */
+    --active-tx:#1e40af;/* indigo-800 */
+  }
+  *{ box-sizing: border-box; }
+  html, body{ margin:0; height:100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+  body::after{ content:""; display:block; height:140px; }
+
+  header{ position: sticky; top:0; z-index:10; background: var(--card); border-bottom:1px solid var(--line); }
+  .bar{ max-width: 1500px; margin: 0 auto; display:flex; gap:12px; align-items:center; padding: 10px 14px; }
+  .brand{ font-weight:800; letter-spacing:.2px; font-size:14px; opacity:.9; }
+  .brand a{ color: inherit; text-decoration: none; }
+  nav{ display:flex; gap:6px; }
+  nav a{ color:#334155; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid transparent; }
+  nav a[aria-current="page"]{ background: var(--active-bg); border-color: var(--active-br); color: var(--active-tx); }
+  .spacer{ flex:1; }
+
+  .wrap{ max-width:1500px; margin: 16px auto 120px; padding: 0 14px; }
+
+  .position-filters{ display:flex; flex-wrap:wrap; gap:8px; margin: 16px 0 24px; justify-content: center; }
+  .filter-btn{ background: var(--card); border: 1px solid var(--line); color: var(--text); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+  .filter-btn:hover{ background: #f9fafb; border-color: var(--rail); }
+  .filter-btn.active{ background: var(--rail); color: var(--text); border-color: var(--rail-dark); font-weight: 600; }
+
+  .stats-info{ text-align: center; margin-bottom: 20px; font-size: 14px; color: var(--muted); }
+
+  .players-grid{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(15,23,42,.06);
+    overflow-x: auto;            /* horizontal scroll when needed */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .players-table{
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1400px;           /* ensure room for many columns */
+  }
+
+  .players-table th{
+    background: #1e293b;
+    color: white;
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #334155;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .players-table th:first-child{ padding-left: 20px; width: 40px; }
+  .players-table th.player-name{ width: 200px; }
+  .players-table th.position{ width: 80px; text-align: center; }
+  .players-table th.rating{ width: 90px; text-align: center; }
+  .players-table th.stat{ width: 110px; text-align: center; }
+
+  .players-table td{
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .players-table td:first-child{ padding-left: 20px; font-weight: 600; color: var(--muted); font-size: 16px; }
+  .players-table tr:hover{ background: #f8fafc; }
+  .players-table tr:last-child td{ border-bottom: none; }
+
+  .player-name-cell{ font-weight: 600; color: var(--text); }
+
+  .position-badge{
+    display:inline-block; padding:4px 8px; border-radius:4px; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; text-align:center;
+  }
+  .position-ST{ background:#fee2e2; color:#dc2626; }
+  .position-AM{ background:#dbeafe; color:#2563eb; }
+  .position-DM{ background:#f3e8ff; color:#7c3aed; }
+  .position-DF{ background:#ecfdf5; color:#059669; }
+  .position-GK{ background:#fef3c7; color:#d97706; }
+
+  .rating-cell{ font-weight:700; font-size:16px; text-align:center; }
+  .rating-excellent{ color:#059669; }
+  .rating-good{ color:#2563eb; }
+  .rating-average{ color:#d97706; }
+  .rating-poor{ color:#dc2626; }
+
+  .stat-cell{ text-align:center; font-weight:500; }
+  .games-cell{ color: var(--muted); font-size: 13px; }
+
+  /* Sorting UI */
+  .sortable{ cursor:pointer; }
+  .sort-wrap{ display:inline-flex; align-items:center; gap:6px; }
+  .sort-arrow{ font-size: 12px; opacity:.85; }
+  .sorted-asc .sort-arrow::after{ content: "▲"; }
+  .sorted-desc .sort-arrow::after{ content: "▼"; }
+
+  .empty,.error{ text-align:center; padding:40px 20px; border-radius:10px; background:var(--card); border:1px dashed var(--line); margin-top:20px; font-size:14px; color:var(--muted);}
+  .error{ border-color:#fecaca; background:#fff5f5; color:#dc2626; }
+  .loading{ text-align:center; padding:40px; font-size:14px; color:var(--muted); }
+
+  @media (max-width: 768px){
+    .wrap{ max-width: 100%; padding: 0 8px; }
+    .players-table th, .players-table td{ padding: 10px 8px; font-size: 12px; }
+    .players-table th:first-child, .players-table td:first-child{ padding-left: 12px; }
+    .players-table th.player-name{ width: 150px; }
+    .filter-btn{ padding: 8px 16px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand"><a href="home.html">Rayo Vilkins FC</a></div>
+      <div class="spacer"></div>
+      <nav>
+        <a href="matches.html">Matches</a>
+        <a href="stats.html" aria-current="page">Stats</a>
+		<a href="wheel.html">Wheel</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="position-filters">
+      <button class="filter-btn active" data-position="all">All</button>
+      <button class="filter-btn" data-position="ST">Strikers (ST)</button>
+      <button class="filter-btn" data-position="AM">Attacking Mid (AM)</button>
+      <button class="filter-btn" data-position="DM">Defensive Mid (DM)</button>
+      <button class="filter-btn" data-position="DF">Defenders (DF)</button>
+      <button class="filter-btn" data-position="GK">Goalkeepers (GK)</button>
+    </div>
+
+    <div id="statsInfo" class="stats-info">Loading player statistics...</div>
+
+    <div id="playersContainer" class="players-grid">
+      <div class="loading">Loading player rankings...</div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const API_BASE = '';
+  
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  const statsInfo = document.getElementById('statsInfo');
+  const playersContainer = document.getElementById('playersContainer');
+
+  // sorting state
+  let currentPosition = 'all';
+  let currentSortKey = 'avg_rating';
+  let currentSortDir = 'desc'; // 'asc' or 'desc'
+  let currentPlayers = [];
+
+  // ----- UI helpers -----
+  function getPositionClass(position) {
+    if (!position) return 'position-DF';
+    if (position === 'ST') return 'position-ST';
+    if (position === 'AM') return 'position-AM';
+    if (position === 'DM') return 'position-DM';
+    if (['RB', 'LB', 'CB', 'DF'].includes(position)) return 'position-DF';
+    if (position === 'GK') return 'position-GK';
+    return 'position-DF';
+  }
+  function getPositionDisplay(position) {
+    if (!position) return 'DF';
+    if (['RB', 'LB', 'CB'].includes(position)) return 'DF';
+    return position;
+  }
+  function getRatingClass(rating) {
+    const r = Number(rating||0);
+    if (r >= 8.5) return 'rating-excellent';
+    if (r >= 7.5) return 'rating-good';
+    if (r >= 6.5) return 'rating-average';
+    return 'rating-poor';
+  }
+
+  // columns per filter (NO duplicate of avg_rating here)
+  function getPositionStats(position) {
+    if (position === 'GK') {
+      return [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+		{ key: 'wins',            label: 'Wins',  type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+        { key: 'total_saves', label: 'Saves', type: 'number' },
+        { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
+        { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+      ];
+    }
+    if (position === 'DF') {
+      return [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+		{ key: 'wins',            label: 'Wins',  type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+        { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
+        { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
+        { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
+        { key: 'red_cards', label: 'Reds', type: 'number' },
+        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
+        { key: 'clean_sheets_def', label: 'DEF CS', type: 'number' },
+        { key: 'def_clean_sheets_rate', label: 'DEF CS%', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+      ];
+    }
+    if (position === 'DM') {
+      return [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+		{ key: 'wins',            label: 'Wins',  type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+        { key: 'total_goals', label: 'Goals', type: 'number' },
+        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
+        { key: 'total_shots', label: 'Shots', type: 'number' },
+        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
+        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
+        { key: 'total_assists', label: 'Assists', type: 'number' },
+        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
+        { key: 'goal_contributions', label: 'G+A', type: 'number' },
+        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
+        { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
+        { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
+        { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
+        { key: 'red_cards', label: 'Reds', type: 'number' },
+        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
+        { key: 'clean_sheets_def', label: 'DEF CS', type: 'number' },
+        { key: 'def_clean_sheets_rate', label: 'DEF CS%', type: 'number' },
+      ];
+    }
+    if (position === 'AM') {
+      return [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+		{ key: 'wins',            label: 'Wins',  type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+        { key: 'total_goals', label: 'Goals', type: 'number' },
+        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
+        { key: 'total_shots', label: 'Shots', type: 'number' },
+        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
+        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
+        { key: 'total_assists', label: 'Assists', type: 'number' },
+        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
+        { key: 'goal_contributions', label: 'G+A', type: 'number' },
+        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
+        { key: 'red_cards', label: 'Reds', type: 'number' },
+        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
+      ];
+    }
+    if (position === 'ST') {
+      return [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+		{ key: 'wins',            label: 'Wins',  type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+        { key: 'total_goals', label: 'Goals', type: 'number' },
+        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
+        { key: 'total_shots', label: 'Shots', type: 'number' },
+        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
+        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
+        { key: 'total_assists', label: 'Assists', type: 'number' },
+        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
+        { key: 'goal_contributions', label: 'G+A', type: 'number' },
+        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
+        { key: 'red_cards', label: 'Reds', type: 'number' },
+        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
+      ];
+    }
+    // ALL players
+    return [
+      { key: 'matches_played', label: 'Games', type: 'number' },
+	  { key: 'wins',            label: 'Wins',  type: 'number' },
+      { key: 'win_rate', label: 'Win%', type: 'number' },
+      { key: 'motm_awards', label: 'MOTM', type: 'number' },
+      { key: 'motm_rate', label: 'MOTM%', type: 'number' },
+      { key: 'total_goals', label: 'Goals', type: 'number' },
+      { key: 'goals_per_match', label: 'G/Game', type: 'number' },
+      { key: 'total_shots', label: 'Shots', type: 'number' },
+      { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
+      { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
+      { key: 'total_assists', label: 'Assists', type: 'number' },
+      { key: 'assists_per_match', label: 'A/Game', type: 'number' },
+      { key: 'goal_contributions', label: 'G+A', type: 'number' },
+      { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
+      { key: 'total_passes_made', label: 'Passes', type: 'number' },
+      { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+      { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
+      { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
+      { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
+      { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
+      { key: 'red_cards', label: 'Reds', type: 'number' },
+      { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
+      { key: 'total_saves', label: 'GK Saves', type: 'number' },
+      { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
+      { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' }
+    ];
+  }
+
+  function formatStat(value, key){
+    if (value === null || value === undefined) return '—';
+    const n = Number(value);
+    if (['win_rate','motm_rate','pass_success_rate','tackle_success_rate','shot_success_rate','def_clean_sheets_rate','gk_clean_sheets_rate','red_cards_rate'].includes(key)) {
+      return Number.isFinite(n) ? n.toFixed(1) + '%' : value + '%';
+    }
+    if (['_per_match'].some(s => key.includes(s))) {
+      return Number.isFinite(n) ? n.toFixed(1) : value;
+    }
+    return Number.isFinite(n) ? (key==='avg_rating' ? n.toFixed(1) : Math.trunc(n)) : value;
+  }
+
+  function sortPlayers(data, key, dir, type) {
+    const mult = dir === 'asc' ? 1 : -1;
+    const cmpNum = (a,b) => {
+      const va = Number(a[key] ?? -Infinity);
+      const vb = Number(b[key] ?? -Infinity);
+      return (va - vb) * mult;
+    };
+    const cmpStr = (a,b) => {
+      const va = String(a[key] ?? '');
+      const vb = String(b[key] ?? '');
+      return va.localeCompare(vb) * mult;
+    };
+    const sorter = (type === 'string') ? cmpStr : cmpNum;
+    return data.slice().sort(sorter);
+  }
+
+  function buildHeader(position, stats){
+    const showPositionCol = position !== 'all';
+    const header = document.createElement('thead');
+    const tr = document.createElement('tr');
+
+    function th(label, cls, sortKey=null, type='number'){
+      const th = document.createElement('th');
+      th.className = cls + (sortKey ? ' sortable' : '');
+      if (sortKey){
+        th.dataset.sortKey = sortKey;
+        th.dataset.sortType = type;
+        const wrap = document.createElement('span');
+        wrap.className = 'sort-wrap';
+        const text = document.createElement('span');
+        text.textContent = label;
+        const arrow = document.createElement('span');
+        arrow.className = 'sort-arrow';
+        wrap.appendChild(text);
+        wrap.appendChild(arrow);
+        th.appendChild(wrap);
+
+        if (currentSortKey === sortKey){
+          th.classList.add(currentSortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        }
+      } else {
+        th.textContent = label;
+      }
+      return th;
+    }
+
+    tr.appendChild(th('#',''));
+    tr.appendChild(th('Player','player-name','player_name','string'));
+    if (showPositionCol) tr.appendChild(th('Pos','position','assigned_position','string'));
+    tr.appendChild(th('Rating','rating','avg_rating','number')); // single rating column
+
+    stats.forEach(s => {
+      tr.appendChild(th(s.label,'stat', s.key, s.type || 'number'));
+    });
+
+    header.appendChild(tr);
+    return header;
+  }
+
+  function buildBody(players, position, stats){
+    const showPositionCol = position !== 'all';
+    const body = document.createElement('tbody');
+
+    players.forEach((player, index) => {
+      const ratingVal = Number(player.avg_rating || 0);
+      const ratingClass = getRatingClass(ratingVal);
+      const positionClass = getPositionClass(player.assigned_position);
+      const positionDisplay = getPositionDisplay(player.assigned_position);
+
+      const tr = document.createElement('tr');
+
+      // #
+      const tdIdx = document.createElement('td');
+      tdIdx.textContent = index + 1;
+      body.appendChild(tr);
+      tr.appendChild(tdIdx);
+
+      // player name
+      const tdName = document.createElement('td');
+      tdName.className = 'player-name-cell';
+      tdName.textContent = player.player_name || 'Unknown';
+      tr.appendChild(tdName);
+
+      // pos (hidden on "All")
+      if (showPositionCol){
+        const tdPos = document.createElement('td');
+        tdPos.innerHTML = `<span class="position-badge ${positionClass}">${positionDisplay}</span>`;
+        tr.appendChild(tdPos);
+      }
+
+      // rating
+      const tdRating = document.createElement('td');
+      tdRating.className = `rating-cell ${ratingClass}`;
+      tdRating.textContent = ratingVal.toFixed(1);
+      tr.appendChild(tdRating);
+
+      // dynamic stats
+      stats.forEach(s => {
+        const td = document.createElement('td');
+        td.className = 'stat-cell';
+        td.textContent = formatStat(player[s.key], s.key);
+        tr.appendChild(td);
+      });
+    });
+
+    return body;
+  }
+
+  function attachSortHandlers(){
+    const ths = document.querySelectorAll('th.sortable');
+    ths.forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sortKey;
+        const type = th.dataset.sortType || 'number';
+        if (!key) return;
+
+        // toggle dir if same key; else default per type
+        if (currentSortKey === key){
+          currentSortDir = (currentSortDir === 'asc') ? 'desc' : 'asc';
+        } else {
+          currentSortKey = key;
+          currentSortDir = (type === 'string') ? 'asc' : 'desc';
+        }
+        renderTable(); // rebuild with new sort
+      });
+    });
+  }
+
+  function renderTable(){
+    // sort currentPlayers according to current sort state
+    const stats = getPositionStats(currentPosition);
+    const sorted = sortPlayers(currentPlayers, currentSortKey, currentSortDir,
+                               (currentSortKey==='player_name'||currentSortKey==='assigned_position')?'string':'number');
+
+    const table = document.createElement('table');
+    table.className = 'players-table';
+    table.appendChild(buildHeader(currentPosition, stats));
+    table.appendChild(buildBody(sorted, currentPosition, stats));
+
+    playersContainer.innerHTML = '';
+    playersContainer.appendChild(table);
+    attachSortHandlers();
+  }
+
+  async function getJSON(path){
+    const res = await fetch(`${API_BASE}${path}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async function loadPlayerRankings(position = 'all') {
+    try {
+      playersContainer.innerHTML = '<div class="loading">Loading player rankings...</div>';
+
+      const suffix = position === 'all' ? 'all' : position.toUpperCase();
+	  const response = await getJSON(`api/players/rankings_${suffix}.json`);
+      currentPlayers = response.players || [];
+      currentPosition = position;
+
+      // Default sort every time the tab changes: by rating desc
+      currentSortKey = 'avg_rating';
+      currentSortDir = 'desc';
+
+      const positionText = position === 'all' ? 'All' : 
+                          position === 'ST' ? 'Strikers' :
+                          position === 'AM' ? 'Attacking Midfielders' :
+                          position === 'DM' ? 'Defensive Midfielders' :
+                          position === 'DF' ? 'Defenders (RB, LB, CB)' :
+                          position === 'GK' ? 'Goalkeepers' : 'Players';
+
+      const top = currentPlayers[0];
+      statsInfo.textContent = `Showing ${currentPlayers.length} ${positionText}`;
+
+      if (currentPlayers.length === 0){
+        playersContainer.innerHTML = '<div class="empty">No players found for this position</div>';
+        return;
+      }
+
+      renderTable();
+    } catch (error) {
+      console.error('Error loading player rankings:', error);
+      playersContainer.innerHTML = `<div class="error">Could not load player rankings – ${error.message}</div>`;
+    }
+  }
+
+  // filter button events
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadPlayerRankings(btn.dataset.position);
+    });
+  });
+
+  // initial load
+  loadPlayerRankings('all');
+})();
+</script>
+</body>
+</html>
