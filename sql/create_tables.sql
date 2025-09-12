@@ -1,3 +1,4 @@
+-- Main matches table
 CREATE TABLE IF NOT EXISTS matches (
     match_id TEXT PRIMARY KEY,
     match_timestamp INTEGER NOT NULL,
@@ -9,7 +10,7 @@ CREATE TABLE IF NOT EXISTS matches (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
+-- Match clubs table with unique constraint
 CREATE TABLE IF NOT EXISTS match_clubs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id TEXT NOT NULL,
@@ -37,10 +38,10 @@ CREATE TABLE IF NOT EXISTS match_clubs (
     -- Store full customKit JSON for all the color codes
     custom_kit_json JSON,
     FOREIGN KEY (match_id) REFERENCES matches(match_id),
-    UNIQUE(match_id, club_id)
+    UNIQUE(match_id, club_id)  -- Prevents duplicate club entries per match
 );
 
-
+-- Match players table with unique constraint
 CREATE TABLE IF NOT EXISTS match_players (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id TEXT NOT NULL,
@@ -74,9 +75,10 @@ CREATE TABLE IF NOT EXISTS match_players (
     vproattr TEXT,  -- The attribute string
     vprohackreason TEXT,
     FOREIGN KEY (match_id) REFERENCES matches(match_id),
-    UNIQUE(match_id, player_id)
+    UNIQUE(match_id, player_id)  -- Prevents duplicate player entries per match
 );
 
+-- Match aggregates table with unique constraint
 CREATE TABLE IF NOT EXISTS match_aggregates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id TEXT NOT NULL,
@@ -106,9 +108,10 @@ CREATE TABLE IF NOT EXISTS match_aggregates (
     vprohackreason INTEGER,
     wins INTEGER,
     FOREIGN KEY (match_id) REFERENCES matches(match_id),
-    UNIQUE(match_id, club_id)
+    UNIQUE(match_id, club_id)  -- Prevents duplicate aggregate entries per match
 );
 
+-- Clubs reference table
 CREATE TABLE IF NOT EXISTS clubs (
     club_id TEXT PRIMARY KEY,
     club_name TEXT,
@@ -120,6 +123,7 @@ CREATE TABLE IF NOT EXISTS clubs (
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Players reference table
 CREATE TABLE IF NOT EXISTS players (
     player_id TEXT PRIMARY KEY,
     player_name TEXT,
@@ -129,6 +133,7 @@ CREATE TABLE IF NOT EXISTS players (
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Fetch history tracking
 CREATE TABLE IF NOT EXISTS fetch_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fetch_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -141,6 +146,7 @@ CREATE TABLE IF NOT EXISTS fetch_history (
     error_message TEXT
 );
 
+-- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_match_timestamp ON matches(match_timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_club_matches ON match_clubs(club_id, match_id);
 CREATE INDEX IF NOT EXISTS idx_player_matches ON match_players(player_id, match_id);
