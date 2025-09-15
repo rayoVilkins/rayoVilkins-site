@@ -48,48 +48,44 @@ jobs:
           mkdir -p build
           mkdir -p public/api/matches
           mkdir -p public/api/players
+          mkdir -p sql
 
-      # ⭐ CRITICAL: Only ONE database initialization step
-      - name: Initialize or restore database
+      # ⭐ If seed exists, import it; otherwise create empty schema+views
+      - name: Prepare database (seed or fresh)
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
           if [ -f sql/seed_data.sql ]; then
-            echo "📥 Restoring database from seed_data.sql..."
+            echo "Seed found. Importing sql/seed_data.sql ..."
             sqlite3 "$DB_PATH" < sql/seed_data.sql
-            echo "✅ Database restored from seed"
           else
-            echo "🆕 No seed found. Creating fresh database..."
+            echo "No seed found. Creating fresh schema + views ..."
             sqlite3 "$DB_PATH" < sql/create_tables.sql
             sqlite3 "$DB_PATH" < sql/create_views.sql
-            echo "✅ Fresh database created"
           fi
 
-      - name: Fetch new EA data
+      - name: Fetch EA data into DB
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
-          echo "🔄 Fetching new matches from EA API..."
-          python fetch_matches.py || echo "⚠️ Fetch had issues but continuing..."
+          python fetch_matches.py
 
-      # ⭐ Export database for next run
-      - name: Export updated database
+      # ⭐ Re-dump data so history accumulates across runs
+      - name: Dump updated seed (data+schema for safety)
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
-          echo "💾 Exporting updated database..."
-          # Full dump includes schema + data
+          # Full dump (schema + data) keeps things robust if schema evolves
           sqlite3 "$DB_PATH" .dump > sql/seed_data.sql
-          echo "✅ Database exported to seed_data.sql ($(wc -l < sql/seed_data.sql) lines)"
+          test -s sql/seed_data.sql && echo "seed_data.sql written."
 
-      - name: Commit updated seed
+      - name: Commit updated seed to repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add sql/seed_data.sql
           if ! git diff --cached --quiet; then
-            MATCHES_COUNT=$(sqlite3 ${{ github.workspace }}/build/proclubs.db "SELECT COUNT(*) FROM matches;" 2>/dev/null || echo "?")
-            git commit -m "🔄 Update seed_data.sql - $MATCHES_COUNT total matches [skip ci]"
+            git commit -m "Update seed_data.sql [skip ci]"
             git push
           else
             echo "No changes in seed_data.sql to commit."
@@ -161,6 +157,7 @@ jobs:
           # 2) Player rankings (pre-slice by position)
           POS = ["all","ST","AM","DM","DF","GK"]
           for pos in POS:
+            # WHERE clause per tab
             where_pos = {
               "all": "",
               "ST":  "AND assigned_position = 'ST'",
@@ -170,9 +167,27 @@ jobs:
               "DF":  "AND assigned_position IN ('RB','LB','CB')",
             }[pos]
 
+            # SELECT column to show in the UI
+            # - 'all' shows NULL (UI can hide the column)
+            # - 'DF' collapses RB/LB/CB into the single bucket label 'DF'
+            # - others show their assigned_position as-is
+            select_pos_expr = {
+              "all": "NULL AS assigned_position",
+              "DF":  "'DF' AS assigned_position",
+              "ST":  "assigned_position",
+              "AM":  "assigned_position",
+              "DM":  "assigned_position",
+              "GK":  "assigned_position",
+            }[pos]
+
+            # GROUP BY trailer:
+            # - nothing extra for 'all' and 'DF'
+            # - for the other tabs we keep grouping by assigned_position
+            group_by_trailer = "" if pos in ("all","DF") else ", assigned_position"
+
             query = f"""
               SELECT
-                CASE WHEN '{pos.upper()}'='ALL' THEN NULL ELSE assigned_position END AS assigned_position,
+                {select_pos_expr},
                 player_id, player_name,
                 COUNT(*) AS matches_played,
                 SUM(CASE WHEN team_result IN (1,16385) THEN 1 ELSE 0 END) AS wins,
@@ -206,11 +221,14 @@ jobs:
                 ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(CASE WHEN team_result IN (1,16385) THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 ELSE 0 END, 1) AS win_rate
               FROM player_match_stats_view
               WHERE club_id = '63719' {where_pos}
-              GROUP BY player_id, player_name{'' if pos=='all' else ', assigned_position'}
+              GROUP BY player_id, player_name{group_by_trailer}
               HAVING matches_played >= 1
             """
             rows = q(conn, query)
-            (out / "players" / f"rankings_{pos}.json").write_text(json.dumps({"success": True, "position_filter": pos, "count": len(rows), "players": rows}), encoding="utf-8")
+            (out / "players" / f"rankings_{pos}.json").write_text(
+              json.dumps({"success": True, "position_filter": pos, "count": len(rows), "players": rows}),
+              encoding="utf-8"
+            )
 
           # 3) Per-match detailed files
           for m in matches:
@@ -234,7 +252,6 @@ jobs:
             p.write_text(json.dumps({"success": True, "match": m, "clubs": clubs, "players": players, "aggregates": aggregates}), encoding="utf-8")
 
           conn.close()
-          print(f"✅ Exported {len(matches)} matches to JSON")
           PY
 
       - name: Configure Pages
