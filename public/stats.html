@@ -37,6 +37,20 @@
 
   .stats-info{text-align:center;margin-bottom:20px;font-size:14px;color:var(--muted)}
 
+  .stats-section{
+    margin-bottom:32px;
+  }
+  
+  .section-title{
+    font-size:18px;
+    font-weight:700;
+    color:var(--text);
+    margin-bottom:12px;
+    padding-left:4px;
+    border-left:4px solid var(--rail);
+    padding-left:12px;
+  }
+
   .players-grid{
     background:var(--card);
     border:1px solid var(--line);
@@ -44,12 +58,13 @@
     box-shadow:0 4px 20px rgba(0,0,0,.3);
     overflow-x:auto;
     -webkit-overflow-scrolling:touch;
+    margin-bottom:24px;
   }
 
   .players-table{
     width:100%;
     border-collapse:collapse;
-    min-width:1400px;
+    min-width:600px;
   }
 
   .players-table th{
@@ -149,7 +164,7 @@
 
     <div id="statsInfo" class="stats-info">Loading player statistics...</div>
 
-    <div id="playersContainer" class="players-grid">
+    <div id="statsContainer">
       <div class="loading">Loading player rankings...</div>
     </div>
   </div>
@@ -160,15 +175,87 @@
   
   const filterButtons = document.querySelectorAll('.filter-btn');
   const statsInfo = document.getElementById('statsInfo');
-  const playersContainer = document.getElementById('playersContainer');
+  const statsContainer = document.getElementById('statsContainer');
 
-  // sorting state
+  // sorting state - now per section
   let currentPosition = 'all';
-  let currentSortKey = 'avg_rating';
-  let currentSortDir = 'desc'; // 'asc' or 'desc'
   let currentPlayers = [];
+  let sectionSorts = {}; // track sort state per section
 
-  // ----- UI helpers -----
+  // Define stat categories
+  const STAT_CATEGORIES = {
+    general: {
+      title: 'General',
+      stats: [
+        { key: 'matches_played', label: 'Games', type: 'number' },
+        { key: 'wins', label: 'Wins', type: 'number' },
+        { key: 'win_rate', label: 'Win%', type: 'number' },
+        { key: 'motm_awards', label: 'MOTM', type: 'number' },
+        { key: 'motm_rate', label: 'MOTM%', type: 'number' }
+      ]
+    },
+    goalScoring: {
+      title: 'Goal Scoring',
+      stats: [
+        { key: 'total_goals', label: 'Goals', type: 'number' },
+        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
+        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
+        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
+        { key: 'total_shots', label: 'Shots', type: 'number' }
+      ]
+    },
+    creativity: {
+      title: 'Creativity',
+      stats: [
+        { key: 'total_assists', label: 'Assists', type: 'number' },
+        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
+        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
+        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
+        { key: 'total_passes_made', label: 'Passes', type: 'number' },
+        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
+        { key: 'goal_contributions', label: 'G+A', type: 'number' }
+      ]
+    },
+    defending: {
+      title: 'Defending',
+      stats: [
+        { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
+        { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
+        { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
+        { key: 'red_cards', label: 'Reds', type: 'number' },
+        { key: 'red_cards_rate', label: 'Reds%', type: 'number' }
+      ]
+    },
+    goalkeeping: {
+      title: 'Goalkeeping',
+      stats: [
+        { key: 'total_saves', label: 'GK Saves', type: 'number' },
+        { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
+        { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' }
+      ]
+    }
+  };
+
+  // Position-specific category visibility
+  function getVisibleCategories(position) {
+    const categories = ['general'];
+    
+    if (position === 'all') {
+      return ['general', 'goalScoring', 'creativity', 'defending', 'goalkeeping'];
+    } else if (position === 'GK') {
+      categories.push('creativity', 'goalkeeping');
+    } else if (position === 'DF') {
+      categories.push('creativity', 'defending');
+    } else if (position === 'DM') {
+      categories.push('goalScoring', 'creativity', 'defending');
+    } else if (position === 'AM' || position === 'ST') {
+      categories.push('goalScoring', 'creativity');
+    }
+    
+    return categories;
+  }
+
+  // UI helpers
   function getPositionClass(position) {
     if (!position) return 'position-DF';
     if (position === 'ST') return 'position-ST';
@@ -178,11 +265,13 @@
     if (position === 'GK') return 'position-GK';
     return 'position-DF';
   }
+
   function getPositionDisplay(position) {
     if (!position) return 'DF';
     if (['RB', 'LB', 'CB'].includes(position)) return 'DF';
     return position;
   }
+
   function getRatingClass(rating) {
     const r = Number(rating||0);
     if (r >= 8.5) return 'rating-excellent';
@@ -191,145 +280,7 @@
     return 'rating-poor';
   }
 
-  // columns per filter (NO duplicate of avg_rating here)
-  function getPositionStats(position) {
-    if (position === 'GK') {
-      return [
-        { key: 'matches_played', label: 'Games', type: 'number' },
-        { key: 'wins',            label: 'Wins',  type: 'number' },
-        { key: 'win_rate', label: 'Win%', type: 'number' },
-        { key: 'motm_awards', label: 'MOTM', type: 'number' },
-        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-        { key: 'total_saves', label: 'Saves', type: 'number' },
-        { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
-        { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' },
-        { key: 'total_passes_made', label: 'Passes', type: 'number' },
-        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-      ];
-    }
-    if (position === 'DF') {
-      return [
-        { key: 'matches_played', label: 'Games', type: 'number' },
-        { key: 'wins',            label: 'Wins',  type: 'number' },
-        { key: 'win_rate', label: 'Win%', type: 'number' },
-        { key: 'motm_awards', label: 'MOTM', type: 'number' },
-        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-        { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
-        { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
-        { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
-        { key: 'red_cards', label: 'Reds', type: 'number' },
-        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
-        { key: 'clean_sheets_def', label: 'DEF CS', type: 'number' },
-        { key: 'def_clean_sheets_rate', label: 'DEF CS%', type: 'number' },
-        { key: 'total_passes_made', label: 'Passes', type: 'number' },
-        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-      ];
-    }
-    if (position === 'DM') {
-      return [
-        { key: 'matches_played', label: 'Games', type: 'number' },
-        { key: 'wins',            label: 'Wins',  type: 'number' },
-        { key: 'win_rate', label: 'Win%', type: 'number' },
-        { key: 'motm_awards', label: 'MOTM', type: 'number' },
-        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-        { key: 'total_goals', label: 'Goals', type: 'number' },
-        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
-        { key: 'total_shots', label: 'Shots', type: 'number' },
-        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
-        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
-        { key: 'total_assists', label: 'Assists', type: 'number' },
-        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
-        { key: 'goal_contributions', label: 'G+A', type: 'number' },
-        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
-        { key: 'total_passes_made', label: 'Passes', type: 'number' },
-        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
-        { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
-        { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
-        { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
-        { key: 'red_cards', label: 'Reds', type: 'number' },
-        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
-        { key: 'clean_sheets_def', label: 'DEF CS', type: 'number' },
-        { key: 'def_clean_sheets_rate', label: 'DEF CS%', type: 'number' },
-      ];
-    }
-    if (position === 'AM') {
-      return [
-        { key: 'matches_played', label: 'Games', type: 'number' },
-        { key: 'wins',            label: 'Wins',  type: 'number' },
-        { key: 'win_rate', label: 'Win%', type: 'number' },
-        { key: 'motm_awards', label: 'MOTM', type: 'number' },
-        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-        { key: 'total_goals', label: 'Goals', type: 'number' },
-        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
-        { key: 'total_shots', label: 'Shots', type: 'number' },
-        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
-        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
-        { key: 'total_assists', label: 'Assists', type: 'number' },
-        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
-        { key: 'goal_contributions', label: 'G+A', type: 'number' },
-        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
-        { key: 'total_passes_made', label: 'Passes', type: 'number' },
-        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
-        { key: 'red_cards', label: 'Reds', type: 'number' },
-        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
-      ];
-    }
-    if (position === 'ST') {
-      return [
-        { key: 'matches_played', label: 'Games', type: 'number' },
-        { key: 'wins',            label: 'Wins',  type: 'number' },
-        { key: 'win_rate', label: 'Win%', type: 'number' },
-        { key: 'motm_awards', label: 'MOTM', type: 'number' },
-        { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-        { key: 'total_goals', label: 'Goals', type: 'number' },
-        { key: 'goals_per_match', label: 'G/Game', type: 'number' },
-        { key: 'total_shots', label: 'Shots', type: 'number' },
-        { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
-        { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
-        { key: 'total_assists', label: 'Assists', type: 'number' },
-        { key: 'assists_per_match', label: 'A/Game', type: 'number' },
-        { key: 'goal_contributions', label: 'G+A', type: 'number' },
-        { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
-        { key: 'total_passes_made', label: 'Passes', type: 'number' },
-        { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-        { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
-        { key: 'red_cards', label: 'Reds', type: 'number' },
-        { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
-      ];
-    }
-    // ALL players
-    return [
-      { key: 'matches_played', label: 'Games', type: 'number' },
-      { key: 'wins',            label: 'Wins',  type: 'number' },
-      { key: 'win_rate', label: 'Win%', type: 'number' },
-      { key: 'motm_awards', label: 'MOTM', type: 'number' },
-      { key: 'motm_rate', label: 'MOTM%', type: 'number' },
-      { key: 'total_goals', label: 'Goals', type: 'number' },
-      { key: 'goals_per_match', label: 'G/Game', type: 'number' },
-      { key: 'total_shots', label: 'Shots', type: 'number' },
-      { key: 'shots_per_match', label: 'Shots/Game', type: 'number' },
-      { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
-      { key: 'total_assists', label: 'Assists', type: 'number' },
-      { key: 'assists_per_match', label: 'A/Game', type: 'number' },
-      { key: 'goal_contributions', label: 'G+A', type: 'number' },
-      { key: 'goal_contributions_per_match', label: 'G+A/Game', type: 'number' },
-      { key: 'total_passes_made', label: 'Passes', type: 'number' },
-      { key: 'passes_made_per_match', label: 'Passes/Game', type: 'number' },
-      { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
-      { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
-      { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
-      { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
-      { key: 'red_cards', label: 'Reds', type: 'number' },
-      { key: 'red_cards_rate', label: 'Reds%', type: 'number' },
-      { key: 'total_saves', label: 'GK Saves', type: 'number' },
-      { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
-      { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' }
-    ];
-  }
-
-  function formatStat(value, key){
+  function formatStat(value, key) {
     if (value === null || value === undefined) return '—';
     const n = Number(value);
     if (['win_rate','motm_rate','pass_success_rate','tackle_success_rate','shot_success_rate','def_clean_sheets_rate','gk_clean_sheets_rate','red_cards_rate'].includes(key)) {
@@ -353,21 +304,46 @@
       const vb = String(b[key] ?? '');
       return va.localeCompare(vb) * mult;
     };
-    const sorter = (type === 'string') ? cmpStr : cmpNum;
-    return data.slice().sort(sorter);
+    return data.slice().sort((type === 'string') ? cmpStr : cmpNum);
   }
 
-  function buildHeader(position, stats){
-    const showPositionCol = position !== 'all';
-    const header = document.createElement('thead');
-    const tr = document.createElement('tr');
+  function buildSectionTable(sectionId, category, players, position) {
+    const showPositionCol = position === 'all';
+    
+    // Get current sort state for this section
+    const currentSort = sectionSorts[sectionId] || { key: 'avg_rating', dir: 'desc' };
+    
+    // Sort players according to current sort state
+    const sorted = sortPlayers(players, currentSort.key, currentSort.dir, 
+                              (currentSort.key === 'player_name' || currentSort.key === 'assigned_position') ? 'string' : 'number');
 
-    function th(label, cls, sortKey=null, type='number'){
+    const container = document.createElement('div');
+    container.className = 'stats-section';
+    
+    const title = document.createElement('h3');
+    title.className = 'section-title';
+    title.textContent = category.title;
+    container.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'players-grid';
+
+    const table = document.createElement('table');
+    table.className = 'players-table';
+
+    // Build header
+    const header = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    function createTh(label, cls, sortKey = null, type = 'number') {
       const th = document.createElement('th');
       th.className = cls + (sortKey ? ' sortable' : '');
-      if (sortKey){
+      
+      if (sortKey) {
         th.dataset.sortKey = sortKey;
         th.dataset.sortType = type;
+        th.dataset.sectionId = sectionId;
+        
         const wrap = document.createElement('span');
         wrap.className = 'sort-wrap';
         const text = document.createElement('span');
@@ -378,8 +354,8 @@
         wrap.appendChild(arrow);
         th.appendChild(wrap);
 
-        if (currentSortKey === sortKey){
-          th.classList.add(currentSortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        if (currentSort.key === sortKey) {
+          th.classList.add(currentSort.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
         }
       } else {
         th.textContent = label;
@@ -387,122 +363,132 @@
       return th;
     }
 
-    tr.appendChild(th('#',''));
-    tr.appendChild(th('Player','player-name','player_name','string'));
-    if (showPositionCol) tr.appendChild(th('Pos','position','assigned_position','string'));
-    tr.appendChild(th('Rating','rating','avg_rating','number')); // single rating column
+    headerRow.appendChild(createTh('#', ''));
+    headerRow.appendChild(createTh('Player', 'player-name', 'player_name', 'string'));
+    if (showPositionCol) headerRow.appendChild(createTh('Pos', 'position', 'assigned_position', 'string'));
+    headerRow.appendChild(createTh('Rating', 'rating', 'avg_rating', 'number'));
 
-    stats.forEach(s => {
-      tr.appendChild(th(s.label,'stat', s.key, s.type || 'number'));
+    category.stats.forEach(stat => {
+      headerRow.appendChild(createTh(stat.label, 'stat', stat.key, stat.type));
     });
 
-    header.appendChild(tr);
-    return header;
-  }
+    header.appendChild(headerRow);
+    table.appendChild(header);
 
-  function buildBody(players, position, stats){
-    const showPositionCol = position !== 'all';
+    // Build body
     const body = document.createElement('tbody');
-
-    players.forEach((player, index) => {
+    sorted.forEach((player, index) => {
       const ratingVal = Number(player.avg_rating || 0);
       const ratingClass = getRatingClass(ratingVal);
       const positionClass = getPositionClass(player.assigned_position);
       const positionDisplay = getPositionDisplay(player.assigned_position);
 
-      const tr = document.createElement('tr');
+      const row = document.createElement('tr');
 
-      // #
-      const tdIdx = document.createElement('td');
-      tdIdx.textContent = index + 1;
-      body.appendChild(tr);
-      tr.appendChild(tdIdx);
+      // # column
+      const idxCell = document.createElement('td');
+      idxCell.textContent = index + 1;
+      row.appendChild(idxCell);
 
-      // player name
-      const tdName = document.createElement('td');
-      tdName.className = 'player-name-cell';
-      tdName.textContent = player.player_name || 'Unknown';
-      tr.appendChild(tdName);
+      // Player name
+      const nameCell = document.createElement('td');
+      nameCell.className = 'player-name-cell';
+      nameCell.textContent = player.player_name || 'Unknown';
+      row.appendChild(nameCell);
 
-      // pos (hidden on "All")
-      if (showPositionCol){
-        const tdPos = document.createElement('td');
-        tdPos.innerHTML = `<span class="position-badge ${positionClass}">${positionDisplay}</span>`;
-        tr.appendChild(tdPos);
+      // Position (only for 'all' filter)
+      if (showPositionCol) {
+        const posCell = document.createElement('td');
+        posCell.innerHTML = `<span class="position-badge ${positionClass}">${positionDisplay}</span>`;
+        row.appendChild(posCell);
       }
 
-      // rating
-      const tdRating = document.createElement('td');
-      tdRating.className = `rating-cell ${ratingClass}`;
-      tdRating.textContent = ratingVal.toFixed(1);
-      tr.appendChild(tdRating);
+      // Rating
+      const ratingCell = document.createElement('td');
+      ratingCell.className = `rating-cell ${ratingClass}`;
+      ratingCell.textContent = ratingVal.toFixed(1);
+      row.appendChild(ratingCell);
 
-      // dynamic stats
-      stats.forEach(s => {
-        const td = document.createElement('td');
-        td.className = 'stat-cell';
-        td.textContent = formatStat(player[s.key], s.key);
-        tr.appendChild(td);
+      // Stats
+      category.stats.forEach(stat => {
+        const statCell = document.createElement('td');
+        statCell.className = 'stat-cell';
+        statCell.textContent = formatStat(player[stat.key], stat.key);
+        row.appendChild(statCell);
       });
+
+      body.appendChild(row);
     });
 
-    return body;
+    table.appendChild(body);
+    grid.appendChild(table);
+    container.appendChild(grid);
+
+    return container;
   }
 
-  function attachSortHandlers(){
-    const ths = document.querySelectorAll('th.sortable');
-    ths.forEach(th => {
+  function attachSortHandlers() {
+    document.querySelectorAll('th.sortable').forEach(th => {
       th.addEventListener('click', () => {
         const key = th.dataset.sortKey;
         const type = th.dataset.sortType || 'number';
-        if (!key) return;
+        const sectionId = th.dataset.sectionId;
+        
+        if (!key || !sectionId) return;
 
-        // toggle dir if same key; else default per type
-        if (currentSortKey === key){
-          currentSortDir = (currentSortDir === 'asc') ? 'desc' : 'asc';
+        // Update sort state for this section
+        const currentSort = sectionSorts[sectionId] || { key: 'avg_rating', dir: 'desc' };
+        
+        if (currentSort.key === key) {
+          currentSort.dir = (currentSort.dir === 'asc') ? 'desc' : 'asc';
         } else {
-          currentSortKey = key;
-          currentSortDir = (type === 'string') ? 'asc' : 'desc';
+          currentSort.key = key;
+          currentSort.dir = (type === 'string') ? 'asc' : 'desc';
         }
-        renderTable(); // rebuild with new sort
+        
+        sectionSorts[sectionId] = currentSort;
+        
+        // Re-render all tables
+        renderAllTables();
       });
     });
   }
 
-  function renderTable(){
-    // sort currentPlayers according to current sort state
-    const stats = getPositionStats(currentPosition);
-    const sorted = sortPlayers(currentPlayers, currentSortKey, currentSortDir,
-                               (currentSortKey==='player_name'||currentSortKey==='assigned_position')?'string':'number');
+  function renderAllTables() {
+    if (!currentPlayers.length) return;
 
-    const table = document.createElement('table');
-    table.className = 'players-table';
-    table.appendChild(buildHeader(currentPosition, stats));
-    table.appendChild(buildBody(sorted, currentPosition, stats));
+    statsContainer.innerHTML = '';
+    
+    const visibleCategories = getVisibleCategories(currentPosition);
+    
+    visibleCategories.forEach(categoryId => {
+      const category = STAT_CATEGORIES[categoryId];
+      if (!category) return;
+      
+      const sectionTable = buildSectionTable(categoryId, category, currentPlayers, currentPosition);
+      statsContainer.appendChild(sectionTable);
+    });
 
-    playersContainer.innerHTML = '';
-    playersContainer.appendChild(table);
     attachSortHandlers();
   }
 
-  async function getJSON(path){
+  async function getJSON(path) {
     const res = await fetch(`${API_BASE}${path}`);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async function loadPlayerRankings(position = 'all') {
     try {
-      playersContainer.innerHTML = '<div class="loading">Loading player rankings...</div>';
+      statsContainer.innerHTML = '<div class="loading">Loading player rankings...</div>';
 
       const suffix = position === 'all' ? 'all' : position.toUpperCase();
       const response = await getJSON(`api/players/rankings_${suffix}.json`);
       currentPlayers = response.players || [];
       currentPosition = position;
 
-      // Default sort every time the tab changes: by rating desc
-      currentSortKey = 'avg_rating';
-      currentSortDir = 'desc';
+      // Reset sort states for new position
+      sectionSorts = {};
 
       const positionText = position === 'all' ? 'All' : 
                           position === 'ST' ? 'Strikers' :
@@ -511,22 +497,21 @@
                           position === 'DF' ? 'Defenders (RB, LB, CB)' :
                           position === 'GK' ? 'Goalkeepers' : 'Players';
 
-      const top = currentPlayers[0];
       statsInfo.textContent = `Showing ${currentPlayers.length} ${positionText}`;
 
-      if (currentPlayers.length === 0){
-        playersContainer.innerHTML = '<div class="empty">No players found for this position</div>';
+      if (currentPlayers.length === 0) {
+        statsContainer.innerHTML = '<div class="empty">No players found for this position</div>';
         return;
       }
 
-      renderTable();
+      renderAllTables();
     } catch (error) {
       console.error('Error loading player rankings:', error);
-      playersContainer.innerHTML = `<div class="error">Could not load player rankings – ${error.message}</div>`;
+      statsContainer.innerHTML = `<div class="error">Could not load player rankings – ${error.message}</div>`;
     }
   }
 
-  // filter button events
+  // Filter button events
   filterButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       filterButtons.forEach(b => b.classList.remove('active'));
@@ -535,7 +520,7 @@
     });
   });
 
-  // initial load
+  // Initial load
   loadPlayerRankings('all');
 })();
 </script>
