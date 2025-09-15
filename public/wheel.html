@@ -2,46 +2,165 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Manager Picker Wheel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rayo Vilkins - Wheel</title>
   <style>
     :root{
-      --bg: #f3f4f6;      /* gray-100 */
-      --card: #ffffff;    /* white */
-      --text: #0f172a;    /* slate-900 */
-      --muted:#475569;    /* slate-600 */
-      --line: #e5e7eb;    /* gray-200 */
-      --rail: #facc15;    /* amber-400 */
-      --rail-dark:#f59e0b;/* amber-500 */
-      --active-bg:#eef2ff;/* indigo-100 */
-      --active-br:#c7d2fe;/* indigo-200 */
-      --active-tx:#1e40af;/* indigo-800 */
+      --bg:#0f0f0f; --card:#1a1a1a; --text:#ffffff; --muted:#a1a1aa; --line:#333333;
+      --rail:#facc15; --rail-dark:#f59e0b; --active-bg:#1e40af; --active-br:#3b82f6; --active-tx:#ffffff;
+      --score:#ffffff; --win:#22c55e; --loss:#ef4444; --draw:#f59e0b;
+      --navy:#ffffff; --pitch:#1a2e1a;
+      --match-bg:#1f1f1f; --match-hover:#2a2a2a; --ft-bg:#333333;
     }
-    *{ box-sizing: border-box; }
-    html, body{ margin:0; height:100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;overflow-x:hidden}
 
-    header{ position: sticky; top:0; z-index:10; background: var(--card); border-bottom:1px solid var(--line); }
-    .bar{ max-width: 1500px; margin: 0 auto; display:flex; gap:12px; align-items:center; padding: 10px 14px; }
-    .brand{ font-weight:800; letter-spacing:.2px; font-size:14px; opacity:.9; }
-    .brand a{ color: inherit; text-decoration: none; }
-    nav{ display:flex; gap:6px; }
-    nav a{ color:#334155; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid transparent; }
-    nav a[aria-current="page"]{ background: var(--active-bg); border-color: var(--active-br); color: var(--active-tx); }
-    .spacer{ flex:1; }
+    /* Header / Nav */
+    header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
+    .bar{max-width:1500px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:10px 14px}
+    .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9;color:var(--text)}
+    .brand a{color:inherit;text-decoration:none}
+    nav{display:flex;gap:6px}
+    nav a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
+    nav a[aria-current="page"]{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx)}
+    nav a:hover{color:var(--text)}
+    .spacer{flex:1}
 
     .main-content{
       display:flex; gap:40px; padding:30px;
       justify-content: center;
       min-height: calc(100vh - 60px);
       align-items: flex-start;
+      max-width: 1200px;
+      margin: 0 auto;
     }
-    .wheel-wrap{ display:flex; flex-direction:column; align-items:center; }
-    #wheel{ width:600px; height:600px; border:8px solid var(--card); border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,.2); cursor:pointer; }
-    #result{ margin-top:18px; font-weight:800; color:var(--active-tx); }
-    .editor{ display:flex; flex-direction:column; }
-    .editor h3{ margin:0 0 10px 0; color: var(--text); }
+    
+    .wheel-wrap{ display:flex; flex-direction:column; align-items:center; flex:1; }
+    #wheel{ 
+      width:min(600px, 90vw); 
+      height:min(600px, 90vw); 
+      border:8px solid var(--card); 
+      border-radius:50%; 
+      box-shadow:0 8px 32px rgba(0,0,0,.5); 
+      cursor:pointer; 
+      transition: transform 0.1s ease;
+      touch-action: manipulation;
+    }
+    #wheel:hover{ transform: scale(1.02); }
+    #wheel:active{ transform: scale(0.98); }
+    
+    #result{ 
+      margin-top:18px; 
+      font-weight:800; 
+      color:var(--rail); 
+      font-size: clamp(16px, 4vw, 24px);
+      text-align: center;
+      padding: 0 20px;
+    }
+    
+    .editor{ 
+      display:flex; 
+      flex-direction:column; 
+      min-width: 260px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    }
+    .editor h3{ 
+      margin:0 0 15px 0; 
+      color: var(--text); 
+      font-size: 18px;
+      font-weight: 700;
+    }
     #players{
-      width:260px; font:14px/1.4 monospace; padding:8px; resize:none; overflow:hidden;
-      border:1px solid var(--line); border-radius:8px; background:var(--card);
+      width:100%; 
+      font:14px/1.4 'Consolas', 'Monaco', monospace; 
+      padding:12px; 
+      resize:none; 
+      overflow:hidden;
+      border:1px solid var(--line); 
+      border-radius:8px; 
+      background:var(--bg);
+      color: var(--text);
+      min-height: 200px;
+    }
+    #players:focus{
+      outline: none;
+      border-color: var(--rail);
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.1);
+    }
+
+    .spin-instruction{
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 768px){
+      .main-content{
+        flex-direction: column;
+        gap: 30px;
+        padding: 20px;
+        align-items: center;
+      }
+      
+      .wheel-wrap{
+        order: 1;
+        width: 100%;
+      }
+      
+      .editor{
+        order: 2;
+        width: 100%;
+        max-width: 400px;
+        min-width: unset;
+      }
+      
+      #wheel{
+        width: min(400px, 85vw);
+        height: min(400px, 85vw);
+        border-width: 6px;
+      }
+      
+      #result{
+        font-size: clamp(14px, 5vw, 20px);
+        margin-top: 15px;
+      }
+      
+      .spin-instruction{
+        font-size: 13px;
+        margin-top: 8px;
+      }
+      
+      #players{
+        font-size: 13px;
+        min-height: 150px;
+      }
+    }
+
+    @media (max-width: 480px){
+      .main-content{
+        padding: 15px;
+      }
+      
+      #wheel{
+        width: min(320px, 80vw);
+        height: min(320px, 80vw);
+        border-width: 4px;
+      }
+      
+      .editor{
+        padding: 15px;
+      }
+      
+      .editor h3{
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
     }
   </style>
 </head>
@@ -62,11 +181,12 @@
     <div class="wheel-wrap">
       <canvas id="wheel" width="600" height="600"></canvas>
       <div id="result">Click the wheel to pick a Manager</div>
+      <div class="spin-instruction">Tap or click the wheel to spin</div>
     </div>
 
     <div class="editor">
       <h3>Edit Players</h3>
-      <textarea id="players"></textarea>
+      <textarea id="players" placeholder="Enter player names, one per line..."></textarea>
     </div>
   </div>
 
@@ -84,15 +204,31 @@
   ];
   inputEl.value = players.join('\n');
 
+  // Responsive canvas sizing
+  function updateCanvasSize() {
+    const size = Math.min(600, window.innerWidth * 0.9, window.innerHeight * 0.6);
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    
+    // Keep internal resolution high for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 600 * dpr;
+    canvas.height = 600 * dpr;
+    ctx.scale(dpr, dpr);
+  }
+
   // auto-resize the textarea to fit content
   function autoResize(){
     inputEl.style.height = 'auto';
-    inputEl.style.height = inputEl.scrollHeight + 'px';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 300) + 'px';
   }
+  
+  // Initial setup
+  updateCanvasSize();
   autoResize();
 
   // Drawing state
-  const R = canvas.width / 2;
+  const R = 300; // Use fixed internal radius for calculations
   const POINTER_ANGLE = Math.PI; // left-pointing arrow
   let angle = 0; // current rotation (radians)
   let spinning = false;
@@ -106,7 +242,7 @@
     const n = Math.max(players.length, 1);
     const step = (2*Math.PI) / n;
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.clearRect(0,0,600,600);
 
     // slices + labels
     for(let i=0;i<n;i++){
@@ -117,10 +253,10 @@
       ctx.beginPath();
       ctx.moveTo(R,R);
       ctx.arc(R,R,R, start, end);
-      ctx.fillStyle = i%2===0 ? '#fbbf24' : '#f59e0b'; // amber/orange alternation
+      ctx.fillStyle = i%2===0 ? '#facc15' : '#f59e0b'; // amber colors from theme
       ctx.fill();
-      ctx.strokeStyle = '#874f00';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#92400e'; // darker amber for borders
+      ctx.lineWidth = 2;
       ctx.stroke();
 
       // text (inward, near rim)
@@ -129,33 +265,40 @@
       const mid = start + step/2;
 
       // Position text near the rim, facing inward
-      const MARGIN_FROM_RIM = 80;              // more space to prevent clipping
+      const MARGIN_FROM_RIM = Math.max(60, R/5);
       const x = R - MARGIN_FROM_RIM;
       ctx.rotate(mid);
       ctx.translate(x,0);
-      ctx.rotate(Math.PI);                     // face inward
+      ctx.rotate(Math.PI); // face inward
 
-      // Adjust font size for longer names
+      // Adjust font size for longer names and smaller screens
       const name = players[i] ?? '';
       const len  = name.length;
-      const fontSize = len > 14 ? 16 : len > 10 ? 18 : 20;
+      let fontSize = len > 14 ? 14 : len > 10 ? 16 : 18;
+      
+      // Scale font for smaller wheels
+      const scale = Math.min(1, R / 300);
+      fontSize *= scale;
 
-      ctx.fillStyle = '#000';
-      ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+      ctx.fillStyle = '#111827'; // dark text for contrast on yellow
+      ctx.font = `bold ${fontSize}px "Segoe UI", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(name, 0, 0);
       ctx.restore();
     }
 
-    // left-side pointer (blue)
-    ctx.fillStyle = 'blue';
+    // left-side pointer (rail color to match theme)
+    ctx.fillStyle = '#facc15';
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, R-16);
-    ctx.lineTo(0, R+16);
-    ctx.lineTo(34, R);
+    ctx.moveTo(0, R-20);
+    ctx.lineTo(0, R+20);
+    ctx.lineTo(40, R);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
   }
 
   function easeOut(t){ return 1 - Math.pow(1 - t, 3); }
@@ -164,7 +307,7 @@
     if(spinning || players.length === 0) return;
     spinning = true;
 
-    const spinMs = 2500;                                  // faster
+    const spinMs = 2500;
     const spinAngle = Math.random()*Math.PI*8 + Math.PI*10;
     const start = angle;
     const t0 = performance.now();
@@ -189,27 +332,38 @@
     const step = (2*Math.PI)/n;
 
     // Convert pointer to the frame where slice 0 starts at 0 when angle=0
-    const local = normalize(POINTER_ANGLE - angle);   // [0, 2π)
-    // Each slice covers [i*step, (i+1)*step). Use floor to get the index.
+    const local = normalize(POINTER_ANGLE - angle);
     let idx = Math.floor(local / step);
     if (idx < 0) idx = 0;
     if (idx > n-1) idx = n-1;
 
     const winner = players[idx] ?? '';
     resultEl.textContent = `Manager: ${winner}`;
+    resultEl.style.color = 'var(--rail)';
   }
 
   // Events
   canvas.addEventListener('click', spin);
+  
+  // Touch support for mobile
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault(); // Prevent scrolling
+    spin();
+  }, { passive: false });
 
   inputEl.addEventListener('input', () => {
     players = inputEl.value.split('\n').map(s=>s.trim()).filter(Boolean);
     autoResize();
-    // keep angle, just redraw (winner will be based on new list after next spin)
     drawWheel();
   });
 
-  // initial paint
+  // Handle window resize
+  window.addEventListener('resize', function() {
+    updateCanvasSize();
+    drawWheel();
+  });
+
+  // Initial paint
   drawWheel();
 })();
 </script>
