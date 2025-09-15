@@ -215,6 +215,7 @@
     goalScoring: {
       title: 'Goal Scoring',
       stats: [
+        { key: 'matches_played', label: 'Games', type: 'number' },
         { key: 'total_goals', label: 'Goals', type: 'number' },
         { key: 'goals_per_match', label: 'G/Game', type: 'number' },
         { key: 'shot_success_rate', label: 'Shot%', type: 'number' },
@@ -225,6 +226,7 @@
     creativity: {
       title: 'Creativity',
       stats: [
+        { key: 'matches_played', label: 'Games', type: 'number' },
         { key: 'total_assists', label: 'Assists', type: 'number' },
         { key: 'assists_per_match', label: 'A/Game', type: 'number' },
         { key: 'pass_success_rate', label: 'Pass%', type: 'number' },
@@ -237,6 +239,7 @@
     defending: {
       title: 'Defending',
       stats: [
+        { key: 'matches_played', label: 'Games', type: 'number' },
         { key: 'total_tackles_made', label: 'Tackles', type: 'number' },
         { key: 'tackles_made_per_match', label: 'Tkl/Game', type: 'number' },
         { key: 'tackle_success_rate', label: 'Tackle%', type: 'number' },
@@ -247,6 +250,7 @@
     goalkeeping: {
       title: 'Goalkeeping',
       stats: [
+        { key: 'matches_played', label: 'Games', type: 'number' },
         { key: 'total_saves', label: 'GK Saves', type: 'number' },
         { key: 'clean_sheets_gk', label: 'GK CS', type: 'number' },
         { key: 'gk_clean_sheets_rate', label: 'GK CS%', type: 'number' }
@@ -384,7 +388,11 @@
     headerRow.appendChild(createTh('#', ''));
     headerRow.appendChild(createTh('Player', 'player-name', 'player_name', 'string'));
     if (showPositionCol) headerRow.appendChild(createTh('Pos', 'position', 'assigned_position', 'string'));
-    headerRow.appendChild(createTh('Rating', 'rating', 'avg_rating', 'number'));
+    
+    // Only show rating column for the General section
+    if (sectionId === 'general') {
+      headerRow.appendChild(createTh('Rating', 'rating', 'avg_rating', 'number'));
+    }
 
     category.stats.forEach(stat => {
       headerRow.appendChild(createTh(stat.label, 'stat', stat.key, stat.type));
@@ -421,11 +429,13 @@
         row.appendChild(posCell);
       }
 
-      // Rating
-      const ratingCell = document.createElement('td');
-      ratingCell.className = `rating-cell ${ratingClass}`;
-      ratingCell.textContent = ratingVal.toFixed(1);
-      row.appendChild(ratingCell);
+      // Rating (only for General section)
+      if (sectionId === 'general') {
+        const ratingCell = document.createElement('td');
+        ratingCell.className = `rating-cell ${ratingClass}`;
+        ratingCell.textContent = ratingVal.toFixed(1);
+        row.appendChild(ratingCell);
+      }
 
       // Stats
       category.stats.forEach(stat => {
