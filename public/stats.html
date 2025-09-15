@@ -342,8 +342,6 @@
   }
 
   function buildSectionTable(sectionId, category, players, position) {
-    const showPositionCol = position === 'all';
-    
     // Get current sort state for this section, or use category-specific default
     const defaultSort = getDefaultSort(sectionId);
     const currentSort = sectionSorts[sectionId] || defaultSort;
@@ -400,7 +398,6 @@
 
     headerRow.appendChild(createTh('#', ''));
     headerRow.appendChild(createTh('Player', 'player-name', 'player_name', 'string'));
-    if (showPositionCol) headerRow.appendChild(createTh('Pos', 'position', 'assigned_position', 'string'));
     
     // Only show rating column for the General section
     if (sectionId === 'general') {
@@ -419,8 +416,6 @@
     sorted.forEach((player, index) => {
       const ratingVal = Number(player.avg_rating || 0);
       const ratingClass = getRatingClass(ratingVal);
-      const positionClass = getPositionClass(player.assigned_position);
-      const positionDisplay = getPositionDisplay(player.assigned_position);
 
       const row = document.createElement('tr');
 
@@ -434,13 +429,6 @@
       nameCell.className = 'player-name-cell';
       nameCell.textContent = player.player_name || 'Unknown';
       row.appendChild(nameCell);
-
-      // Position (only for 'all' filter)
-      if (showPositionCol) {
-        const posCell = document.createElement('td');
-        posCell.innerHTML = `<span class="position-badge ${positionClass}">${positionDisplay}</span>`;
-        row.appendChild(posCell);
-      }
 
       // Rating (only for General section)
       if (sectionId === 'general') {
@@ -540,14 +528,8 @@
         sectionSorts[categoryId] = getDefaultSort(categoryId);
       });
 
-      const positionText = position === 'all' ? 'All' : 
-                          position === 'ST' ? 'Strikers' :
-                          position === 'AM' ? 'Attacking Midfielders' :
-                          position === 'DM' ? 'Defensive Midfielders' :
-                          position === 'DF' ? 'Defenders (RB, LB, CB)' :
-                          position === 'GK' ? 'Goalkeepers' : 'Players';
-
-      statsInfo.textContent = `Showing ${currentPlayers.length} ${positionText}`;
+      // Remove the "Showing X players" text
+      statsInfo.style.display = 'none';
 
       if (currentPlayers.length === 0) {
         statsContainer.innerHTML = '<div class="empty">No players found for this position</div>';
