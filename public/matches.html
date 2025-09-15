@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pro Clubs - Matches</title>
+<title>Rayo Vilkins - Matches</title>
 <style>
   :root{
-    --bg:#f3f4f6; --card:#ffffff; --text:#0f172a; --muted:#475569; --line:#e5e7eb;
-    --rail:#facc15; --rail-dark:#f59e0b; --active-bg:#eef2ff; --active-br:#c7d2fe; --active-tx:#1e40af;
-    --score:#0b1320; --win:#16a34a; --loss:#dc2626; --draw:#f59e0b;
-    --navy:#0f172a; --pitch:#e8f5e9;
+    --bg:#0f0f0f; --card:#1a1a1a; --text:#ffffff; --muted:#a1a1aa; --line:#333333;
+    --rail:#facc15; --rail-dark:#f59e0b; --active-bg:#1e40af; --active-br:#3b82f6; --active-tx:#ffffff;
+    --score:#ffffff; --win:#22c55e; --loss:#ef4444; --draw:#f59e0b;
+    --navy:#ffffff; --pitch:#1a2e1a;
+    --match-bg:#1f1f1f; --match-hover:#2a2a2a; --ft-bg:#333333;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
@@ -18,141 +19,297 @@
   /* Header / Nav */
   header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
   .bar{max-width:1500px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:10px 14px}
-  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9}
+  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9;color:var(--text)}
   .brand a{color:inherit;text-decoration:none}
   nav{display:flex;gap:6px}
-  nav a{color:#334155;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
   nav a[aria-current="page"]{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx)}
+  nav a:hover{color:var(--text)}
   .spacer{flex:1}
 
   /* Page */
-  .wrap{max-width:840px;margin:14px auto 100px;padding:0 12px}
+  .wrap{max-width:1200px;margin:14px auto 100px;padding:0 12px}
 
+  /* Top Section */
+  .top-section{background:var(--card);border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid var(--line)}
+  
   /* Filters */
-  .filters{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:end;margin:2px 0 12px}
-  .filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
-  .filters input[type="date"]{background:#fff;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
-  .filters button{background:#fff;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
-  .filters button:hover{background:#f9fafb}
-  .filters .info{font-size:12px;color:var(--muted)}
+  .filters{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:12px;align-items:end;margin-bottom:16px}
+  .filter-group{display:flex;flex-direction:column;gap:4px}
+  .filter-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .filters input[type="date"], .filters input[type="text"]{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;min-width:140px}
+  .filters input[type="text"]{min-width:200px}
+  .filters button{background:var(--active-bg);color:var(--active-tx);border:none;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:500;height:fit-content}
+  .filters button:hover{opacity:.9}
+  .filters button#reset{background:var(--match-bg);color:var(--text);border:1px solid var(--line)}
+  .filters button#reset:hover{background:var(--match-hover)}
+  .info{font-size:12px;color:var(--muted)}
 
   /* Summary */
-  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:12px 0}
-  .summary-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
-  .summary-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .summary-value{font-size:20px;font-weight:800;margin-top:4px}
+  .summary{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+  .summary-card{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:16px 12px;text-align:center;transition:all .2s}
+  .summary-card:hover{border-color:var(--rail);transform:translateY(-1px)}
+  .summary-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin-bottom:6px}
+  .summary-value{font-size:24px;font-weight:800;color:var(--text);line-height:1}
   .summary-value.win{color:var(--win)} .summary-value.draw{color:var(--draw)} .summary-value.loss{color:var(--loss)}
 
+  /* Match Results - New Design */
+  .match-type-section{margin-bottom:20px}
+  .match-type-header{font-size:14px;color:var(--muted);margin-bottom:8px;padding-left:4px;font-weight:600;text-align:center}
+  
+  .match-result{
+    display:flex;
+    align-items:center;
+    background:var(--match-bg);
+    border-radius:8px;
+    padding:12px 16px;
+    margin-bottom:8px;
+    cursor:pointer;
+    transition:background-color .2s;
+    border:1px solid var(--line);
+  }
+  .match-result:hover{background:var(--match-hover)}
+
+  .ft-indicator{
+    background:var(--ft-bg);
+    color:var(--muted);
+    padding:4px 8px;
+    border-radius:4px;
+    font-size:11px;
+    font-weight:600;
+    min-width:24px;
+    text-align:center;
+    margin-right:20px;
+  }
+
+  .match-content{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    gap:16px;
+  }
+
+  .team-section{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex:1;
+  }
+
+  .team-section.home{
+    justify-content:flex-end;
+  }
+
+  .team-section.away{
+    justify-content:flex-start;
+  }
+
+  .team-name{
+    font-size:16px;
+    font-weight:500;
+    color:var(--text);
+  }
+
+  .team-crest{
+    width:24px;
+    height:24px;
+    object-fit:contain;
+  }
+  .team-crest.placeholder{
+    background:var(--muted);
+    border-radius:50%;
+    display:inline-block;
+  }
+
+  .score-section{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:18px;
+    font-weight:700;
+    color:var(--text);
+    min-width:60px;
+    justify-content:center;
+  }
+
+  .score-section.win{color:var(--win)}
+  .score-section.loss{color:var(--loss)}
+  .score-section.draw{color:var(--draw)}
+
+  .score-separator{
+    color:var(--muted);
+    margin:0 4px;
+  }
+
+  .match-date{
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px solid var(--line);
+  }
+
   /* Pager */
-  .pager{display:flex;gap:6px;align-items:center;justify-content:flex-start;margin:10px 0 8px}
-  .pager button{border:1px solid var(--line);background:#fff;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px}
-  .pager button[disabled]{opacity:.5;cursor:not-allowed}
+  .pager{display:flex;gap:6px;align-items:center;justify-content:center;margin:16px 0 24px;padding:16px;background:var(--card);border-radius:8px;border:1px solid var(--line)}
+  .pager button{border:1px solid var(--line);background:var(--bg);color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;min-width:36px}
+  .pager button[disabled]{opacity:.4;cursor:not-allowed}
+  .pager button:hover:not([disabled]){background:var(--match-hover)}
   .pager .page-btn.active{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx);font-weight:600}
-  .pager .info{font-size:12px;color:var(--muted);margin-left:8px}
+  .pager .info{font-size:12px;color:var(--muted);margin-left:12px}
 
-  /* Boards / Cards */
-  .group-meta{font-size:12px;color:var(--muted);margin:4px 2px 6px}
-  .board{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 6px rgba(15,23,42,.05);overflow:hidden}
-  .board::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:linear-gradient(180deg,var(--rail),var(--rail-dark))}
-  .item + .item{border-top:1px solid var(--line)}
-  .item{cursor:pointer;transition:background-color .2s}
-  .item:hover{background:#f8fafc}
+  .empty,.error{text-align:center;padding:12px 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line);margin-top:10px;font-size:12px;color:var(--muted)}
+  .error{border-color:#ef4444;background:#1f1113;color:#fca5a5}
 
-  .row{display:grid;grid-template-columns:1fr auto auto 8px auto auto 1fr;align-items:center;gap:12px;padding:12px 16px 6px 20px}
-  .team{font-size:clamp(15px,2.6vw,18px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;top:2px;line-height:1}
-  .left.team{text-align:right;padding-right:6px}
-  .right.team{text-align:left;padding-left:6px}
-  .crest{width:28px;height:28px;object-fit:contain;align-self:center;transform:translateY(3px)}
-  .crest.left{margin-right:10px} .crest.right{margin-left:10px}
-  .crest.placeholder{background:#cbd5e1;border-radius:50%;border:1px solid #cbd5e1;display:inline-block}
-  .score{font-weight:900;font-size:clamp(26px,4vw,30px);color:var(--score)}
-  .row.res-W .score{color:var(--win)}
-  .row.res-L .score{color:var(--loss)}
-  .row.res-D .score{color:var(--draw)}
-  .pipe{width:2px;height:18px;background:var(--rail);border-radius:2px;justify-self:center}
-
-  .match-details{padding:0 16px 10px 20px;display:grid;grid-template-columns:1fr auto 1fr;gap:14px;font-size:13px;font-weight:600;font-family:"Segoe UI Rounded","SF Pro Rounded",system-ui,sans-serif;color:var(--text);align-items:start}
-  .details-left{text-align:right} .details-right{text-align:left} .details-center{text-align:center}
-  .detail-label{font-weight:600;margin-bottom:3px;text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);display:block}
-  .detail-value{line-height:1.4;white-space:pre-wrap;word-break:break-word;margin-bottom:6px}
-  .date{text-align:center;padding:0 16px 12px 20px;font-size:12px;color:var(--muted)}
-
-  .empty,.error{text-align:center;padding:12px 10px;border-radius:10px;background:#fff;border:1px dashed var(--line);margin-top:10px;font-size:12px}
-  .error{border-color:#fecaca;background:#fff5f5}
-
-  /* Modal */
-  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+  /* Modal - Fixed Size */
+  .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
   .modal-overlay.show{display:flex}
-  .modal{background:var(--card);border-radius:14px;width:100%;max-width:1080px;max-height:90vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-  .modal-header{background:#1e293b;color:#fff;padding:16px 20px;position:relative}
-  .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px}
+  .modal{background:var(--card);border-radius:14px;width:100%;max-width:1080px;height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);border:1px solid var(--line);display:flex;flex-direction:column}
+  .modal-header{background:#0a0a0a;color:var(--text);padding:16px 20px;position:relative;border-bottom:1px solid var(--line);flex-shrink:0}
+  .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px}
   .modal-close:hover{opacity:.85}
-  .modal-match-info{text-align:center;font-size:12px;opacity:.85;margin-bottom:8px}
+  .modal-match-info{text-align:center;font-size:12px;opacity:.85;margin-bottom:8px;color:var(--muted)}
   .match-score-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;margin-bottom:8px}
-  .modal-team{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .modal-team{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text)}
   .modal-team.left{justify-content:flex-end} .modal-team.right{justify-content:flex-start}
   .modal-crest{width:26px;height:26px;object-fit:contain}
   .modal-score-section{text-align:center}
-  .modal-final-score{font-size:32px;font-weight:800}
+  .modal-final-score{font-size:32px;font-weight:800;color:var(--text)}
   .ms-win{color:var(--win)} .ms-loss{color:var(--loss)} .ms-draw{color:var(--draw)}
 
-  .match-events{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;margin-top:6px}
+  .match-events{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;margin-top:6px}
   .events-left{text-align:right}.events-right{text-align:left}
-  .events-center{text-align:center;font-size:12px;opacity:.7}
-  .event-line{margin-bottom:2px;font-size:13px}
+  .events-center{text-align:center;font-size:12px;opacity:.7;color:var(--muted)}
+  .event-line{margin-bottom:1px;font-size:13px;color:var(--text)}
 
-  .modal-content{overflow-y:auto;max-height:calc(90vh - 180px)}
-  .tab-navigation{display:flex;background:#f1f5f9;border-bottom:1px solid var(--line)}
-  .tab-button{flex:1;padding:10px 16px;background:none;border:none;font-size:14px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent}
-  .tab-button.active{background:#fff;border-bottom-color:var(--rail);color:var(--active-tx)}
-  .tab-button:hover:not(.active){background:#e2e8f0}
-  .tab-content{display:none;padding:18px} .tab-content.active{display:block}
+  .modal-content{overflow-y:auto;flex:1;background:var(--card)}
+  .tab-navigation{display:flex;background:var(--bg);border-bottom:1px solid var(--line);flex-shrink:0}
+  .tab-button{flex:1;padding:10px 16px;background:none;border:none;font-size:14px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;color:var(--muted)}
+  .tab-button.active{background:var(--card);border-bottom-color:var(--rail);color:var(--text)}
+  .tab-button:hover:not(.active){background:var(--match-hover);color:var(--text)}
+  .tab-content{display:none;padding:8px;height:100%} .tab-content.active{display:block}
 
-  /* Formation / Pitch (clean background, fixed badges) */
-  .lineups-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-  .formation-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
-  .formation-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .team-title{font-weight:700}
-  .formation-label{font-size:12px;color:var(--muted)}
-  .pitch{position:relative;background:var(--pitch);border:1px solid var(--line);border-radius:10px;height:480px;overflow:hidden}
+  /* Formation / Pitch - Compact for no scroll */
+  .lineups-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:100%}
+  .formation-section{display:flex;flex-direction:column;height:100%}
+  .formation-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px}
+  .team-title{font-weight:700;color:var(--text);font-size:14px}
+  .formation-label{font-size:10px;color:var(--muted);background:var(--bg);padding:2px 5px;border-radius:3px}
+  
+  .pitch{position:relative;background:linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);border:2px solid var(--line);border-radius:8px;height:360px;overflow:hidden;flex:1;
+         box-shadow:inset 0 2px 8px rgba(0,0,0,0.3)}
+  
+  /* Pitch markings */
+  .pitch::before{content:"";position:absolute;top:50%;left:50%;width:90px;height:90px;border:1px solid #404040;border-radius:50%;transform:translate(-50%,-50%)}
+  .pitch::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:#404040;border-radius:50%;transform:translate(-50%,-50%)}
 
-  .slot{position:absolute; /* exact field coordinate anchor */
-        width:0;height:0;}
-  .badge{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;
-         display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
-         transform:translate(-50%,-50%);}
-  .badge.home{background:var(--rail);color:#111827}
-  .badge.away{background:#111827;color:#fff}
-  .badge.bot{background:#cbd5e1;color:#334155}
-  .player-label{position:absolute;left:0;top:26px;transform:translateX(-50%);font-size:12px;
-                white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;text-align:center}
+  .slot{position:absolute;width:0;height:0;z-index:2}
+  .badge{position:absolute;left:0;top:0;width:36px;height:36px;border-radius:50%;
+         display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;
+         transform:translate(-50%,-50%);transition:all .2s;cursor:pointer;
+         box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+  .badge:hover{transform:translate(-50%,-50%) scale(1.1)}
+  .badge.home{background:linear-gradient(135deg, #facc15 0%, #f59e0b 100%);color:#111827;border:2px solid rgba(255,255,255,0.2)}
+  .badge.away{background:linear-gradient(135deg, #374151 0%, #1f2937 100%);color:#fff;border:2px solid rgba(255,255,255,0.1)}
+  .badge.bot{background:linear-gradient(135deg, #6b7280 0%, #4b5563 100%);color:#e5e7eb;border:2px solid rgba(255,255,255,0.1)}
+  
+  .player-label{position:absolute;left:0;top:22px;transform:translateX(-50%);font-size:9px;
+                white-space:nowrap;max-width:85px;overflow:hidden;text-overflow:ellipsis;text-align:center;color:var(--text);
+                font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,0.8);z-index:3}
 
-  /* Stats bars (kept) */
+  /* Stats bars */
   .bars{display:grid;gap:18px}
   .bar-block{display:grid;gap:6px}
-  .bar-title{font-size:14px;font-weight:600;text-align:center}
+  .bar-title{font-size:14px;font-weight:600;text-align:center;color:var(--text)}
   .bar-row{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:12px}
-  .bar-num{font-weight:700}
-  .track{position:relative;height:12px;background:#f1f5f9;border-radius:8px;overflow:hidden}
+  .bar-num{font-weight:700;color:var(--text)}
+  .track{position:relative;height:12px;background:var(--bg);border-radius:8px;overflow:hidden;border:1px solid var(--line)}
   .bar-left{position:absolute;left:0;top:0;bottom:0;background:var(--rail)}
-  .bar-right{position:absolute;right:0;top:0;bottom:0;background:#0f172a}
+  .bar-right{position:absolute;right:0;top:0;bottom:0;background:var(--text)}
 
-  @media (max-width:560px){
-    .wrap{max-width:100%}
-    .row{grid-template-columns:1fr auto auto 6px auto auto 1fr;padding:10px 12px 4px 16px;gap:10px}
-    .team{font-size:clamp(14px,4.6vw,17px)}
-    .score{font-size:clamp(24px,6vw,28px)}
-    .crest{width:24px;height:24px;transform:translateY(1px)}
-    .date{padding:0 12px 10px 16px}
-    .match-details{padding:0 12px 8px 16px;grid-template-columns:1fr;gap:10px}
-    .details-left,.details-right,.details-center{text-align:left}
-    .modal{margin:8px;max-width:calc(100% - 16px)}
-    .lineups-grid{grid-template-columns:1fr;gap:16px}
+  /* H2H Styles */
+  .h2h-summary{background:var(--match-bg);border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid var(--line)}
+  .h2h-summary h3{text-align:center;margin:0 0 10px 0;font-size:16px;color:var(--text)}
+  .h2h-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center}
+  .h2h-stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .h2h-stat-value{font-size:18px;font-weight:700;color:var(--text)}
+  .h2h-stat-value.wins{color:var(--win)}
+  .h2h-stat-value.draws{color:var(--draw)}
+  .h2h-stat-value.losses{color:var(--loss)}
+  .h2h-match{display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;gap:10px;padding:8px 10px;background:var(--match-bg);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+  .h2h-score{color:var(--text);font-weight:600}
+  .h2h-score.win{color:var(--win)}
+  .h2h-score.draw{color:var(--draw)}
+  .h2h-score.loss{color:var(--loss)}
+  .h2h-match-date{font-size:12px;color:var(--muted)}
+
+  @media (max-width:768px){
+    .wrap{max-width:100%;padding:0 8px}
+    
+    /* Mobile filters */
+    .filters{grid-template-columns:1fr;gap:12px;align-items:stretch}
+    .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .search-row{display:grid;grid-template-columns:1fr;gap:8px}
+    .button-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .filters input[type="date"], .filters input[type="text"]{min-width:unset;width:100%}
+    .filters button{width:100%}
+    
+    /* Mobile summary */
+    .summary{grid-template-columns:repeat(3,1fr);gap:8px}
+    .summary-card{padding:12px 8px}
+    .summary-value{font-size:20px}
+    
+    /* Mobile match results */
+    .match-result{padding:10px 12px}
+    .ft-indicator{margin-right:12px;font-size:10px;padding:3px 6px}
+    .team-name{font-size:14px}
+    .score-section{font-size:16px}
+    .team-crest{width:20px;height:20px}
+    
+    /* Mobile pager */
+    .pager{padding:12px;flex-wrap:wrap;justify-content:center}
+    .pager .info{margin-left:0;margin-top:8px;width:100%;text-align:center}
+    
+    /* Modal adjustments */
+    .modal{margin:8px;max-width:calc(100% - 16px);height:90vh}
+    .lineups-grid{grid-template-columns:1fr;gap:12px}
+    .pitch{min-height:300px}
+    .badge{width:32px;height:32px;font-size:10px}
+    .player-label{font-size:9px;top:20px;max-width:70px}
     .match-score-header{grid-template-columns:1fr;gap:10px;text-align:center}
     .match-events{grid-template-columns:1fr;gap:6px;text-align:center}
     .events-left,.events-right{text-align:center}
-    .pitch{height:380px}
   }
+  
+/* === Line-ups + other tabs: remove inner vertical scrolling and fixed heights === */
+
+/* Let the modal/content expand instead of scrolling internally */
+.modal-content,
+#lineups.tab-content,
+#stats.tab-content,
+#h2h.tab-content {
+  overflow-y: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Make the formation/pitch areas flexible height */
+.formation-section {
+  min-height: 0 !important;
+}
+
+.pitch {
+  height: auto !important;
+  min-height: 620px;
+  overflow: hidden;
+}
+
+/* Keep if you want explicit spacing on the Line-ups tab */
+#lineups.tab-content {
+  overflow: visible !important;
+  padding-bottom: 8px;
+}
 </style>
 </head>
 <body>
@@ -163,23 +320,35 @@
       <nav>
         <a href="matches.html" aria-current="page">Matches</a>
         <a href="stats.html">Stats</a>
-		<a href="wheel.html">Wheel</a>
+        <a href="wheel.html">Wheel</a>
       </nav>
     </div>
   </header>
   <div class="wrap">
-    <div class="filters">
-      <label>From <input type="date" id="fromDate" /></label>
-      <label>To <input type="date" id="toDate" /></label>
-      <button id="apply">Apply</button>
-      <button id="reset">Reset</button>
-      <span id="rangeInfo" class="info"></span>
+    <div class="top-section">
+      <div class="filters">
+        <div class="filter-group filter-row">
+          <label class="filter-label">From</label>
+          <input type="date" id="fromDate" />
+        </div>
+        <div class="filter-group filter-row">
+          <label class="filter-label">To</label>
+          <input type="date" id="toDate" />
+        </div>
+        <div class="filter-group search-row">
+          <label class="filter-label">Search</label>
+          <input type="text" id="searchInput" placeholder="Team name..." />
+        </div>
+        <div class="button-row">
+          <button id="apply">Apply</button>
+        </div>
+        <div class="button-row">
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+
+      <div id="summary" class="summary" style="display:none;"></div>
     </div>
-
-    <div id="summary" class="summary" style="display:none;"></div>
-
-    <!-- Pager sits above results -->
-    <div id="pager" class="pager" style="display:none;"></div>
 
     <div id="status" class="info">Loading matches…</div>
     <div id="boards"></div>
@@ -215,13 +384,13 @@
 
   function crestEl(teamId, name, side){
     const img = document.createElement('img');
-    img.className = 'crest ' + (side||'');
+    img.className = 'team-crest ' + (side||'');
     img.src = crestUrl(teamId);
     img.alt = '';
     if(name) img.setAttribute('aria-label', name);
     img.onerror = function(){
       const ph = document.createElement('span');
-      ph.className = 'crest placeholder ' + (side||'');
+      ph.className = 'team-crest placeholder ' + (side||'');
       ph.setAttribute('role','img');
       if(name) ph.setAttribute('aria-label', name);
       img.replaceWith(ph);
@@ -232,13 +401,12 @@
   const el = {
     from: document.getElementById('fromDate'),
     to: document.getElementById('toDate'),
+    search: document.getElementById('searchInput'),
     apply: document.getElementById('apply'),
     reset: document.getElementById('reset'),
-    info: document.getElementById('rangeInfo'),
     boards: document.getElementById('boards'),
     status: document.getElementById('status'),
     summary: document.getElementById('summary'),
-    pager: document.getElementById('pager'),
     modal: document.getElementById('matchModal'),
     modalInfo: document.getElementById('modalMatchInfo'),
   };
@@ -271,7 +439,7 @@
       const { match, clubs = [], players = [], aggregates = [], head_to_head = {} } = response;
 
       renderMatchHeader(match, clubs, players);
-      renderLineups(clubs, players);     // updated formation rendering
+      renderLineups(clubs, players);
       renderMatchStats(Array.isArray(aggregates) ? aggregates : []);
 
       const ourIsClub1 = (clubs?.[0]?.club_id === OUR_CLUB_ID);
@@ -370,32 +538,28 @@
       const twoDM = dms.length >= 2;
       const formationName = twoDM ? '4-2-3-1' : '4-1-4-1';
 
-      /* Coordinates with GK at TOP and ST at BOTTOM */
       const base = [];
       base.push({role:'GK', x:50, y:8});
+      base.push({role:'LB', x:20, y:26});
+      base.push({role:'CB', x:40, y:26});
+      base.push({role:'CB', x:60, y:26});
+      base.push({role:'RB', x:80, y:26});
 
-base.push({role:'LB', x:20, y:26});
-base.push({role:'CB', x:40, y:26});
-base.push({role:'CB', x:60, y:26});
-base.push({role:'RB', x:80, y:26});
+      if (twoDM) {
+        base.push({role:'DM', x:40, y:46});
+        base.push({role:'DM', x:60, y:46});
+        base.push({role:'AM', x:30, y:66});
+        base.push({role:'AM', x:50, y:66});
+        base.push({role:'AM', x:70, y:66});
+      } else {
+        base.push({role:'DM', x:50, y:46});
+        base.push({role:'AM', x:20, y:66});
+        base.push({role:'AM', x:40, y:66});
+        base.push({role:'AM', x:60, y:66});
+        base.push({role:'AM', x:80, y:66});
+      }
 
-if (twoDM) {
-  base.push({role:'DM', x:40, y:46});
-  base.push({role:'DM', x:60, y:46});
-
-  base.push({role:'AM', x:30, y:66});
-  base.push({role:'AM', x:50, y:66});
-  base.push({role:'AM', x:70, y:66});
-} else {
-  base.push({role:'DM', x:50, y:46});
-
-  base.push({role:'AM', x:20, y:66});
-  base.push({role:'AM', x:40, y:66});
-  base.push({role:'AM', x:60, y:66});
-  base.push({role:'AM', x:80, y:66});
-}
-
-base.push({role:'ST', x:50, y:86});
+      base.push({role:'ST', x:50, y:86});
 
       const pop = (arr)=>arr.length ? arr.shift() : null;
 
@@ -424,8 +588,8 @@ base.push({role:'ST', x:50, y:86});
       }).join('');
 
       return `
-        <div class="formation-card">
-          <div class="formation-top">
+        <div class="formation-section">
+          <div class="formation-header">
             <div class="team-title">${teamName}</div>
             <div class="formation-label">${formationName}</div>
           </div>
@@ -510,9 +674,9 @@ base.push({role:'ST', x:50, y:86});
     const ourLosses = summary.our_losses || 0;
 
     document.getElementById('h2h').innerHTML = `
-      <div class="h2h-summary" style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px">
-        <h3 style="text-align:center;margin:0 0 10px 0;font-size:16px">Previous Meetings</h3>
-        <div class="h2h-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center">
+      <div class="h2h-summary">
+        <h3>Previous Meetings</h3>
+        <div class="h2h-stats">
           <div><div class="h2h-stat-label">Played</div><div class="h2h-stat-value">${totalPlayed}</div></div>
           <div><div class="h2h-stat-label">Won</div><div class="h2h-stat-value wins">${ourWins}</div></div>
           <div><div class="h2h-stat-label">Draw</div><div class="h2h-stat-value draws">${draws}</div></div>
@@ -521,15 +685,15 @@ base.push({role:'ST', x:50, y:86});
       </div>
       ${totalPlayed>0 ? `
         <div class="h2h-matches">
-          <h4 style="margin:0 0 8px 0">Previous Scores</h4>
+          <h4 style="margin:0 0 8px 0;color:var(--text)">Previous Scores</h4>
           ${matches.slice(0,5).map(m=>{
             const rc = (m.our_result===1||m.our_result===16385)?'win':(m.our_result===4?'draw':'loss');
             return `
-              <div class="h2h-match" style="display:grid;grid-template-columns:1fr auto 1fr auto;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
+              <div class="h2h-match">
                 <div></div>
                 <div class="h2h-score ${rc}">Rayo Vilkins ${m.our_goals} - ${m.opponent_goals} Opponent</div>
                 <div></div>
-                <div class="h2h-match-date" style="font-size:12px;color:var(--muted)">${fmtDate(m.match_timestamp)}</div>
+                <div class="h2h-match-date">${fmtDate(m.match_timestamp)}</div>
               </div>
             `;
           }).join('')}
@@ -537,50 +701,62 @@ base.push({role:'ST', x:50, y:86});
     `;
   }
 
-  /* -------------------- MATCH LIST (pagination) -------------------- */
+  /* -------------------- NEW MATCH RENDERING -------------------- */
+  function buildMatchResult(match) {
+    const container = document.createElement('div');
+    container.className = 'match-result';
+    container.addEventListener('click', () => openModal(match.match_id));
+
+    const ourGoals = parseInt(match.our_goals) || 0;
+    const oppGoals = parseInt(match.opponent_goals) || 0;
+    
+    let scoreClass = '';
+    if (match.result === 'W') scoreClass = 'win';
+    else if (match.result === 'L') scoreClass = 'loss';
+    else scoreClass = 'draw';
+
+    container.innerHTML = `
+      <div class="ft-indicator">FT</div>
+      <div class="match-content">
+        <div class="team-section home">
+          <span class="team-name">${match.our_club_name || 'Rayo Vilkins'}</span>
+          <img class="team-crest" src="${crestUrl(match.our_team_id || 480)}" alt="" onerror="this.className='team-crest placeholder'">
+        </div>
+        
+        <div class="score-section ${scoreClass}">
+          <span>${ourGoals}</span>
+          <span class="score-separator">-</span>
+          <span>${oppGoals}</span>
+        </div>
+        
+        <div class="team-section away">
+          <img class="team-crest" src="${crestUrl(match.opponent_team_id || 1)}" alt="" onerror="this.className='team-crest placeholder'">
+          <span class="team-name">${match.opponent_club_name || 'Unknown'}</span>
+        </div>
+      </div>
+    `;
+
+    // Add match date
+    const dateDiv = document.createElement('div');
+    dateDiv.className = 'match-date';
+    dateDiv.textContent = fmtDate(match.match_timestamp);
+    container.appendChild(dateDiv);
+
+    return container;
+  }
+
+  /* -------------------- MATCH LIST (pagination with match type separation) -------------------- */
   let filteredMatches = [];
   let currentPage = 1;
-  const pageSize = 6;
+  const pageSize = 7;
 
-  function buildItem(match){
-    const item = h('div',{class:'item'});
-    item.addEventListener('click', ()=>openModal(match.match_id));
-
-    const L = parseInt(match.our_goals)||0;
-    const R = parseInt(match.opponent_goals)||0;
-    const rowClass = match.result==='W'?'res-W':(match.result==='L'?'res-L':'res-D');
-
-    const row = h('div',{class:`row ${rowClass}`});
-    const lName = h('div',{class:'team left'}, match.our_club_name || 'Rayo Vilkins');
-    const lCrest = crestEl(match.our_team_id || 480, match.our_club_name,'left');
-    const lScore = h('div',{class:'score'}, String(L));
-    const pipe   = h('div',{class:'pipe'});
-    const rScore = h('div',{class:'score'}, String(R));
-    const rCrest = crestEl(match.opponent_team_id || 1, match.opponent_club_name,'right');
-    const rName  = h('div',{class:'team right'}, match.opponent_club_name || 'Unknown');
-    row.append(lName,lCrest,lScore,pipe,rScore,rCrest,rName);
-    item.appendChild(row);
-
-    const showOurGoals = !!match.our_goalscorers;
-    const showOurAssists = !!match.our_assisters;
-    const showOppGoals = !!match.opponent_goalscorers;
-    const showOppAssists = !!match.opponent_assisters;
-
-    if (showOurGoals || showOurAssists || showOppGoals || showOppAssists){
-      const details = h('div',{class:'match-details'});
-      const leftCol = h('div',{class:'details-left'});
-      if (showOurGoals)    leftCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'⚽ GOALS'),   h('div',{class:'detail-value'}, match.our_goalscorers)));
-      if (showOurAssists)  leftCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'🎯 ASSISTS'), h('div',{class:'detail-value'}, match.our_assisters)));
-      const centerCol = h('div',{class:'details-center'});
-      const rightCol = h('div',{class:'details-right'});
-      if (showOppGoals)    rightCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'⚽ GOALS'),   h('div',{class:'detail-value'}, match.opponent_goalscorers)));
-      if (showOppAssists)  rightCol.appendChild(h('div',{class:'detail-pair'}, h('div',{class:'detail-label'},'🎯 ASSISTS'), h('div',{class:'detail-value'}, match.opponent_assisters)));
-      details.append(leftCol,centerCol,rightCol);
-      item.appendChild(details);
+  function getMatchTypeName(matchType) {
+    switch(matchType) {
+      case 1: return 'League Matches';
+      case 3: return 'Playoff Matches'; 
+      case 9: return 'Cup Matches';
+      default: return 'Friendly Matches';
     }
-
-    item.appendChild(h('div',{class:'date'}, fmtDate(match.match_timestamp)));
-    return item;
   }
 
   function renderSummary(matches) {
@@ -618,8 +794,14 @@ base.push({role:'ST', x:50, y:86});
   }
 
   function renderPager(total, page, pages){
-    if (pages <= 1){ el.pager.style.display='none'; el.pager.innerHTML=''; return; }
-    el.pager.style.display='flex';
+    if (pages <= 1){ 
+      const pagerDiv = document.createElement('div');
+      pagerDiv.id = 'pager';
+      pagerDiv.style.display = 'none';
+      el.boards.parentNode.appendChild(pagerDiv);
+      return; 
+    }
+    
     const makeBtn = (label, disabled, handler, extra='') => {
       const b = document.createElement('button');
       b.innerText = label;
@@ -628,16 +810,20 @@ base.push({role:'ST', x:50, y:86});
       b.addEventListener('click', handler);
       return b;
     };
-    el.pager.innerHTML = '';
-    el.pager.append(makeBtn('« Prev', page===1, ()=>goTo(page-1)));
+    
+    const pagerDiv = document.createElement('div');
+    pagerDiv.id = 'pager';
+    pagerDiv.className = 'pager';
+    
+    pagerDiv.append(makeBtn('« Prev', page===1, ()=>goTo(page-1)));
     const windowSize = 7;
     let start = Math.max(1, page - Math.floor(windowSize/2));
     let end = Math.min(pages, start + windowSize - 1);
     if (end - start + 1 < windowSize) start = Math.max(1, end - windowSize + 1);
     for(let i=start;i<=end;i++){
-      el.pager.append(makeBtn(String(i), false, ()=>goTo(i), 'page-btn'+(i===page?' active':'')));
+      pagerDiv.append(makeBtn(String(i), false, ()=>goTo(i), 'page-btn'+(i===page?' active':'')));
     }
-    el.pager.append(
+    pagerDiv.append(
       makeBtn('Next »', page===pages, ()=>goTo(page+1)),
       (()=>{
         const span=document.createElement('span');
@@ -646,51 +832,88 @@ base.push({role:'ST', x:50, y:86});
         return span;
       })()
     );
+    
+    el.boards.parentNode.appendChild(pagerDiv);
   }
 
   function renderPage(){
     const {page,pages,total,slice} = paginate(filteredMatches, currentPage, pageSize);
 
     el.boards.innerHTML = '';
+    
+    // Remove existing pager if it exists
+    const existingPager = document.getElementById('pager');
+    if(existingPager) existingPager.remove();
+    
+    // Group matches by match type
     const groups = new Map();
     for(const m of slice){
-      const mt = m.match_type==1?'League Matches'
-             : m.match_type==3?'Playoff Matches'
-             : m.match_type==9?'Cup Matches'
-             : 'Friendly Matches';
-      if(!groups.has(mt)) groups.set(mt, []);
-      groups.get(mt).push(m);
+      const matchType = getMatchTypeName(m.match_type);
+      if(!groups.has(matchType)) groups.set(matchType, []);
+      groups.get(matchType).push(m);
     }
+    
+    // Render each match type section
+    for(const [matchType, matchList] of groups.entries()){
+      const section = document.createElement('div');
+      section.className = 'match-type-section';
+      
+      const header = document.createElement('div');
+      header.className = 'match-type-header';
+      header.textContent = `${matchType} (${matchList.length})`;
+      section.appendChild(header);
+      
+      matchList.forEach(match => {
+        section.appendChild(buildMatchResult(match));
+      });
+      
+      el.boards.appendChild(section);
+    }
+    
+    // Render pagination after results
     renderPager(total, page, pages);
-    for(const [mt,list] of groups.entries()){
-      el.boards.appendChild(h('div',{class:'group-meta'}, `${mt} - ${list.length} match${list.length>1?'es':''}`));
-      const board = h('section',{class:'board'});
-      list.forEach(m=>board.appendChild(buildItem(m)));
-      el.boards.appendChild(board);
-    }
   }
 
   function goTo(p){ currentPage = p; renderPage(); }
 
   async function load(){
-    const fv = el.from.value, tv = el.to.value;
+    const fv = el.from.value, tv = el.to.value, searchTerm = el.search.value.toLowerCase().trim();
     if(!fv || !tv){ el.status.textContent='Select a valid date range.'; return; }
     if(new Date(fv) > new Date(tv)){ el.status.textContent='"From" must be before "To".'; return; }
 
-    el.info.textContent = `Showing matches from ${fv} to ${tv}`;
     el.status.textContent = 'Loading matches…';
     el.boards.innerHTML = '';
     el.summary.style.display = 'none';
-    el.pager.style.display = 'none';
+    
+    // Remove existing pager
+    const existingPager = document.getElementById('pager');
+    if(existingPager) existingPager.remove();
+    
     currentPage = 1;
 
     try{
       const response = await getJSON('api/matches/all.json');
       const matches  = response.matches || [];
       const fromU = startUnix(fv), toU = endUnix(tv);
-      const inRange = matches.filter(m => m.match_timestamp >= fromU && m.match_timestamp <= toU)
-                             .sort((a,b)=> b.match_timestamp - a.match_timestamp);
-      if(!inRange.length){ el.status.innerHTML = '<div class="empty">No matches in this date range.</div>'; return; }
+      let inRange = matches.filter(m => m.match_timestamp >= fromU && m.match_timestamp <= toU);
+      
+      // Apply search filter if search term exists
+      if(searchTerm) {
+        inRange = inRange.filter(m => {
+          const ourName = (m.our_club_name || 'Rayo Vilkins').toLowerCase();
+          const oppName = (m.opponent_club_name || 'Unknown').toLowerCase();
+          return ourName.includes(searchTerm) || oppName.includes(searchTerm);
+        });
+      }
+      
+      inRange = inRange.sort((a,b)=> b.match_timestamp - a.match_timestamp);
+      
+      if(!inRange.length){ 
+        el.status.innerHTML = searchTerm ? 
+          '<div class="empty">No matches found for your search criteria.</div>' : 
+          '<div class="empty">No matches in this date range.</div>'; 
+        return; 
+      }
 
       renderSummary(inRange);
       filteredMatches = inRange;
@@ -698,14 +921,22 @@ base.push({role:'ST', x:50, y:86});
       renderPage();
     }catch(e){
       console.error(e);
-      el.status.innerHTML = `<div class="error">Could not reach your API – ${e.message}</div>`;
+      el.status.innerHTML = `<div class="error">Could not reach your API — ${e.message}</div>`;
     }
   }
 
   // Init
-  const {from,to} = defaultDates(); el.from.value=from; el.to.value=to;
+  const {from,to} = defaultDates(); el.from.value=from; el.to.value=to; el.search.value='';
   el.apply.addEventListener('click', load);
-  el.reset.addEventListener('click', ()=>{ const d=defaultDates(); el.from.value=d.from; el.to.value=d.to; load(); });
+  el.reset.addEventListener('click', ()=>{ const d=defaultDates(); el.from.value=d.from; el.to.value=d.to; el.search.value=''; load(); });
+  
+  // Add real-time search
+  let searchTimeout;
+  el.search.addEventListener('input', ()=>{
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(load, 300); // Debounce search by 300ms
+  });
+  
   load();
 })();
 </script>
