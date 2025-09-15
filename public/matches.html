@@ -162,7 +162,7 @@
   .empty,.error{text-align:center;padding:12px 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line);margin-top:10px;font-size:12px;color:var(--muted)}
   .error{border-color:#ef4444;background:#1f1113;color:#fca5a5}
 
-  /* Modal */
+  /* Modal - Fixed Size */
   .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
   .modal-overlay.show{display:flex}
   .modal{background:var(--card);border-radius:14px;width:100%;max-width:1080px;height:85vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);border:1px solid var(--line);display:flex;flex-direction:column}
@@ -188,25 +188,35 @@
   .tab-button{flex:1;padding:10px 16px;background:none;border:none;font-size:14px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;color:var(--muted)}
   .tab-button.active{background:var(--card);border-bottom-color:var(--rail);color:var(--text)}
   .tab-button:hover:not(.active){background:var(--match-hover);color:var(--text)}
-  .tab-content{display:none;padding:18px} .tab-content.active{display:block}
+  .tab-content{display:none;padding:8px;height:100%} .tab-content.active{display:block}
 
-  /* Formation / Pitch */
-  .lineups-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-  .formation-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px}
-  .formation-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .team-title{font-weight:700;color:var(--text)}
-  .formation-label{font-size:12px;color:var(--muted)}
-  .pitch{position:relative;background:var(--pitch);border:1px solid var(--line);border-radius:10px;height:480px;overflow:hidden}
+  /* Formation / Pitch - Compact for no scroll */
+  .lineups-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:100%}
+  .formation-section{display:flex;flex-direction:column;height:100%}
+  .formation-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px}
+  .team-title{font-weight:700;color:var(--text);font-size:14px}
+  .formation-label{font-size:10px;color:var(--muted);background:var(--bg);padding:2px 5px;border-radius:3px}
+  
+  .pitch{position:relative;background:linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);border:2px solid var(--line);border-radius:8px;height:360px;overflow:hidden;flex:1;
+         box-shadow:inset 0 2px 8px rgba(0,0,0,0.3)}
+  
+  /* Pitch markings */
+  .pitch::before{content:"";position:absolute;top:50%;left:50%;width:90px;height:90px;border:1px solid #404040;border-radius:50%;transform:translate(-50%,-50%)}
+  .pitch::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:5px;background:#404040;border-radius:50%;transform:translate(-50%,-50%)}
 
-  .slot{position:absolute;width:0;height:0;}
-  .badge{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;
-         display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;
-         transform:translate(-50%,-50%);}
-  .badge.home{background:var(--rail);color:#111827}
-  .badge.away{background:#111827;color:#fff}
-  .badge.bot{background:#cbd5e1;color:#334155}
-  .player-label{position:absolute;left:0;top:26px;transform:translateX(-50%);font-size:12px;
-                white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;text-align:center;color:var(--text)}
+  .slot{position:absolute;width:0;height:0;z-index:2}
+  .badge{position:absolute;left:0;top:0;width:36px;height:36px;border-radius:50%;
+         display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;
+         transform:translate(-50%,-50%);transition:all .2s;cursor:pointer;
+         box-shadow:0 2px 6px rgba(0,0,0,0.4)}
+  .badge:hover{transform:translate(-50%,-50%) scale(1.1)}
+  .badge.home{background:linear-gradient(135deg, #facc15 0%, #f59e0b 100%);color:#111827;border:2px solid rgba(255,255,255,0.2)}
+  .badge.away{background:linear-gradient(135deg, #374151 0%, #1f2937 100%);color:#fff;border:2px solid rgba(255,255,255,0.1)}
+  .badge.bot{background:linear-gradient(135deg, #6b7280 0%, #4b5563 100%);color:#e5e7eb;border:2px solid rgba(255,255,255,0.1)}
+  
+  .player-label{position:absolute;left:0;top:22px;transform:translateX(-50%);font-size:9px;
+                white-space:nowrap;max-width:85px;overflow:hidden;text-overflow:ellipsis;text-align:center;color:var(--text);
+                font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,0.8);z-index:3}
 
   /* Stats bars */
   .bars{display:grid;gap:18px}
@@ -263,14 +273,43 @@
     
     /* Modal adjustments */
     .modal{margin:8px;max-width:calc(100% - 16px);height:90vh}
-    .lineups-grid{grid-template-columns:1fr;gap:16px}
-    .pitch{height:380px}
+    .lineups-grid{grid-template-columns:1fr;gap:12px}
+    .pitch{min-height:300px}
     .badge{width:32px;height:32px;font-size:10px}
     .player-label{font-size:9px;top:20px;max-width:70px}
     .match-score-header{grid-template-columns:1fr;gap:10px;text-align:center}
     .match-events{grid-template-columns:1fr;gap:6px;text-align:center}
     .events-left,.events-right{text-align:center}
   }
+  
+/* === Line-ups + other tabs: remove inner vertical scrolling and fixed heights === */
+
+/* Let the modal/content expand instead of scrolling internally */
+.modal-content,
+#lineups.tab-content,
+#stats.tab-content,
+#h2h.tab-content {
+  overflow-y: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Make the formation/pitch areas flexible height */
+.formation-section {
+  min-height: 0 !important;
+}
+
+.pitch {
+  height: auto !important;
+  min-height: 620px;
+  overflow: hidden;
+}
+
+/* Keep if you want explicit spacing on the Line-ups tab */
+#lineups.tab-content {
+  overflow: visible !important;
+  padding-bottom: 8px;
+}
 </style>
 </head>
 <body>
@@ -549,8 +588,8 @@
       }).join('');
 
       return `
-        <div class="formation-card">
-          <div class="formation-top">
+        <div class="formation-section">
+          <div class="formation-header">
             <div class="team-title">${teamName}</div>
             <div class="formation-label">${formationName}</div>
           </div>
