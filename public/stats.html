@@ -82,7 +82,7 @@
     padding:10px 8px;
     text-align:left;
     font-weight:600;
-    font-size:12px;
+    font-size:13px;  /* Change this value to adjust header font size */
     text-transform:uppercase;
     letter-spacing:0.5px;
     border-bottom:1px solid var(--line);
@@ -99,15 +99,15 @@
   .players-table td{
     padding:8px 6px;
     border-bottom:1px solid var(--line);
-    font-size:13px;
+    font-size:14px;  /* Change this value to adjust cell font size */
     white-space:nowrap;
   }
 
-  .players-table td:first-child{padding-left:12px;font-weight:600;color:var(--muted);font-size:14px}
+  .players-table td:first-child{padding-left:12px;font-weight:600;color:var(--muted);font-size:15px}  /* Rank number font size */
   .players-table tr:hover{background:var(--match-hover)}
   .players-table tr:last-child td{border-bottom:none}
 
-  .player-name-cell{font-weight:600;color:var(--text);font-size:13px}
+  .player-name-cell{font-weight:600;color:var(--text);font-size:14px}  /* Player name font size */
 
   .position-badge{
     display:inline-block;padding:3px 6px;border-radius:3px;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;text-align:center;
@@ -124,7 +124,7 @@
   .rating-average{color:var(--draw)}
   .rating-poor{color:var(--loss)}
 
-  .stat-cell{text-align:center;font-weight:500;color:var(--text);font-size:13px}
+  .stat-cell{text-align:center;font-weight:500;color:var(--text);font-size:14px}  /* Stat cell font size */
   .games-cell{color:var(--muted);font-size:12px}
 
   /* Sorting UI */
@@ -258,23 +258,35 @@
     }
   };
 
-  // Position-specific category visibility
+  // Position-specific category visibility and ordering
   function getVisibleCategories(position) {
-    const categories = ['general'];
-    
     if (position === 'all') {
-      return ['general', 'goalScoring', 'creativity', 'defending', 'goalkeeping'];
+      return ['general', 'goalScoring', 'creativity', 'defending']; // Removed goalkeeping
     } else if (position === 'GK') {
-      categories.push('creativity', 'goalkeeping');
+      return ['general', 'goalkeeping', 'creativity'];
     } else if (position === 'DF') {
-      categories.push('creativity', 'defending');
+      return ['general', 'defending', 'creativity'];
     } else if (position === 'DM') {
-      categories.push('goalScoring', 'creativity', 'defending');
-    } else if (position === 'AM' || position === 'ST') {
-      categories.push('goalScoring', 'creativity');
+      return ['general', 'defending', 'goalScoring', 'creativity'];
+    } else if (position === 'AM') {
+      return ['general', 'creativity', 'goalScoring'];
+    } else if (position === 'ST') {
+      return ['general', 'goalScoring', 'creativity'];
     }
     
-    return categories;
+    return ['general'];
+  }
+
+  // Get appropriate default sort for each category
+  function getDefaultSort(categoryId) {
+    switch(categoryId) {
+      case 'general': return { key: 'avg_rating', dir: 'desc' };
+      case 'goalScoring': return { key: 'total_goals', dir: 'desc' };
+      case 'creativity': return { key: 'total_assists', dir: 'desc' };
+      case 'defending': return { key: 'total_tackles_made', dir: 'desc' };
+      case 'goalkeeping': return { key: 'total_saves', dir: 'desc' };
+      default: return { key: 'avg_rating', dir: 'desc' };
+    }
   }
 
   // UI helpers
@@ -332,8 +344,9 @@
   function buildSectionTable(sectionId, category, players, position) {
     const showPositionCol = position === 'all';
     
-    // Get current sort state for this section
-    const currentSort = sectionSorts[sectionId] || { key: 'avg_rating', dir: 'desc' };
+    // Get current sort state for this section, or use category-specific default
+    const defaultSort = getDefaultSort(sectionId);
+    const currentSort = sectionSorts[sectionId] || defaultSort;
     
     // Sort players according to current sort state
     const sorted = sortPlayers(players, currentSort.key, currentSort.dir, 
@@ -520,8 +533,12 @@
       currentPlayers = response.players || [];
       currentPosition = position;
 
-      // Reset sort states for new position
+      // Initialize sort states with category-specific defaults
       sectionSorts = {};
+      const visibleCategories = getVisibleCategories(position);
+      visibleCategories.forEach(categoryId => {
+        sectionSorts[categoryId] = getDefaultSort(categoryId);
+      });
 
       const positionText = position === 'all' ? 'All' : 
                           position === 'ST' ? 'Strikers' :
