@@ -546,8 +546,10 @@
       const ams = byRole(teamPlayers,'AM');
       const sts = byRole(teamPlayers,'ST');
 
-      const twoDM = dms.length >= 2;
-      const formationName = twoDM ? '4-2-3-1' : '4-1-4-1';
+      const totalPlayers = teamPlayers.length;
+      const dmCount = dms.length;
+      const useDoubleDM = dmCount >= 2 || (dmCount === 1 && totalPlayers < 5);
+      const formationName = useDoubleDM ? '4-2-3-1' : '4-1-4-1';
 
       const base = [];
       base.push({role:'GK', x:50, y:8});
@@ -556,7 +558,7 @@
       base.push({role:'CB', x:60, y:26});
       base.push({role:'RB', x:80, y:26});
 
-      if (twoDM) {
+      if (useDoubleDM) {
         base.push({role:'DM', x:40, y:46});
         base.push({role:'DM', x:60, y:46});
         base.push({role:'AM', x:30, y:66});
