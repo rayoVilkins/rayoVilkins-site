@@ -118,7 +118,7 @@
     .chart-controls{flex-direction:column}
     .checkbox-group{justify-content:center}
     .stats-grid{grid-template-columns:repeat(2,1fr)}
-    .correlation-matrix{grid-template-columns:100px repeat(6,1fr);font-size:10px}
+    .correlation-matrix{grid-template-columns:100px repeat(4,1fr);font-size:10px}
     .matrix-cell{padding:6px 3px}
   }
 </style>
@@ -155,15 +155,15 @@
             <label class="control-label">Metrics to Display</label>
             <div class="checkbox-group" id="metricControls">
               <div class="checkbox-item active" data-metric="passSuccess">
-                <div class="stat-color" style="background:#3b82f6"></div>
+                <div class="stat-color" style="background:#8b5cf6"></div>
                 Pass Success %
               </div>
               <div class="checkbox-item active" data-metric="tackleSuccess">
-                <div class="stat-color" style="background:#f59e0b"></div>
+                <div class="stat-color" style="background:#06b6d4"></div>
                 Tackle Success %
               </div>
               <div class="checkbox-item active" data-metric="shotSuccess">
-                <div class="stat-color" style="background:#ef4444"></div>
+                <div class="stat-color" style="background:#f97316"></div>
                 Shot Success %
               </div>
             </div>
@@ -256,16 +256,16 @@
   let displayedMatchesData = [];
   let trendsChart = null;
   
-  // Chart colors
+  // Chart colors - distinct from result colors
   const COLORS = {
-    passSuccess: '#3b82f6', 
-    tackleSuccess: '#f59e0b',
-    shotSuccess: '#ef4444'
+    passSuccess: '#8b5cf6', 
+    tackleSuccess: '#06b6d4',
+    shotSuccess: '#f97316'
   };
   
   const RESULT_COLORS = {
     'W': '#22c55e',
-    'D': '#f59e0b', 
+    'D': '#fbbf24', 
     'L': '#ef4444'
   };
 
@@ -305,9 +305,11 @@
         goalsScored,
         goalsConceded,
         ourGoals: goalsScored,
-        oppGoals: goalsConceded
+        oppGoals: goalsConceded,
+        // Add flag for invalid matches (disconnects)
+        isValid: !(passSuccess === 100 && (goalsScored + goalsConceded) <= 3)
       };
-    });
+    }).filter(match => match.isValid); // Filter out invalid matches
   }
 
   function updateDisplayedMatches() {
@@ -324,7 +326,6 @@
       createTrendsChart(displayedMatchesData);
       renderFormStrip(displayedMatchesData);
       renderKeyStats(displayedMatchesData);
-      renderCorrelationMatrix(displayedMatchesData);
       renderConsistencyBars(displayedMatchesData);
       renderTacticalInsights(displayedMatchesData);
     }
@@ -434,7 +435,9 @@
               }
             },
             min: 0,
-            max: 100
+            max: 100,
+            beginAtZero: true,
+            suggestedMax: 100
           }
         },
         interaction: {
@@ -477,6 +480,7 @@
     // Calculate averages and trends
     const avgPasses = data.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / data.length;
     const avgTackles = data.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / data.length;
+    const avgShots = data.reduce((sum, m) => sum + (m.shotSuccess || 0), 0) / data.length;
     const winRate = (data.filter(m => m.result === 'W').length / data.length) * 100;
     const avgGoalsFor = data.reduce((sum, m) => sum + (m.goalsScored || 0), 0) / data.length;
     const avgGoalsAgainst = data.reduce((sum, m) => sum + (m.goalsConceded || 0), 0) / data.length;
@@ -496,6 +500,10 @@
       <div class="stat-item">
         <div class="stat-value">${avgTackles.toFixed(1)}%</div>
         <div class="stat-label">Tackle Success</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${avgShots.toFixed(1)}%</div>
+        <div class="stat-label">Shot Success</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">${avgGoalsFor.toFixed(1)}</div>
@@ -519,11 +527,6 @@
         <div class="stat-value ${currentStreak.type}">${currentStreak.count}</div>
         <div class="stat-label">Current Streak</div>
         <div class="stat-trend">${currentStreak.text}</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${(avgGoalsFor - avgGoalsAgainst).toFixed(1)}</div>
-        <div class="stat-label">Goal Difference</div>
-        <div class="stat-trend">Per Game</div>
       </div>
     `;
   }
@@ -673,21 +676,35 @@
   }
 
   function calculateConsistency(values) {
-    if (values.length < 2) return 0;
+    if (values.length < 3) return 0;
     
-    // Filter out invalid values
-    const validValues = values.filter(v => typeof v === 'number' && !isNaN(v) && isFinite(v));
-    if (validValues.length < 2) return 0;
+    // Filter out invalid values (NaN, Infinity, null, undefined)
+    const validValues = values.filter(v => 
+      typeof v === 'number' && 
+      !isNaN(v) && 
+      isFinite(v) && 
+      v >= 0
+    );
+    
+    if (validValues.length < 3) return 0;
     
     const mean = validValues.reduce((sum, val) => sum + val, 0) / validValues.length;
-    const variance = validValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / validValues.length;
+    
+    // Handle edge case where all values are the same
+    if (validValues.every(v => v === validValues[0])) return 100;
+    
+    const variance = validValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (validValues.length - 1);
     const stdDev = Math.sqrt(variance);
     
-    // Convert to consistency percentage (lower coefficient of variation = higher consistency)
-    const coefficientOfVariation = mean !== 0 ? stdDev / Math.abs(mean) : 1;
-    const consistency = Math.max(0, Math.min(100, (1 - coefficientOfVariation) * 100));
+    // Calculate coefficient of variation (CV)
+    const coefficientOfVariation = mean > 0 ? stdDev / mean : 1;
     
-    return consistency;
+    // Convert to consistency percentage - lower CV means higher consistency
+    // Cap CV at 1.0 for reasonable scaling
+    const cappedCV = Math.min(coefficientOfVariation, 1.0);
+    const consistency = (1 - cappedCV) * 100;
+    
+    return Math.max(0, Math.min(100, consistency));
   }
 
   function renderTacticalInsights(data) {
@@ -718,55 +735,55 @@
     const losses = data.filter(d => d.result === 'L');
     const draws = data.filter(d => d.result === 'D');
     
-    // Goal scoring patterns
-    const avgGoalsInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + m.goalsScored, 0) / wins.length : 0;
-    const avgGoalsInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + m.goalsScored, 0) / losses.length : 0;
+    // EFFICIENCY ANALYSIS
+    const avgShotsInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + (m.shotSuccess || 0), 0) / wins.length : 0;
+    const avgShotsInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + (m.shotSuccess || 0), 0) / losses.length : 0;
     
-    if (wins.length > 0 && avgGoalsInWins >= 2) {
+    if (wins.length > 0 && losses.length > 0 && avgShotsInWins > avgShotsInLosses + 8) {
       insights.push({
-        title: 'Strong Attacking Wins',
-        description: `You average ${avgGoalsInWins.toFixed(1)} goals in victories. Your attack is clinical when the team clicks.`,
-        impact: 'High - Maintain attacking confidence and create more chances'
+        title: '🎯 Clinical Finishing Wins Games',
+        description: `Your shot conversion is ${(avgShotsInWins - avgShotsInLosses).toFixed(1)}% higher in victories. When your strikers are clinical, you win more consistently.`,
+        impact: 'High - Focus on finishing drills and composure in front of goal'
       });
     }
     
-    // Defensive solidity
+    // DEFENSIVE SOLIDITY
     const avgConcededInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + m.goalsConceded, 0) / wins.length : 0;
     const avgConcededInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + m.goalsConceded, 0) / losses.length : 0;
     
-    if (wins.length > 0 && losses.length > 0 && avgConcededInLosses > avgConcededInWins + 1) {
+    if (wins.length > 0 && losses.length > 0 && avgConcededInLosses > avgConcededInWins + 1.2) {
       insights.push({
-        title: 'Defense Wins Matches',
-        description: `You concede ${(avgConcededInLosses - avgConcededInWins).toFixed(1)} more goals per game in losses vs wins. Defensive stability is crucial.`,
-        impact: 'High - Focus on defensive structure and organization'
+        title: '🛡️ Defense Wins Championships',
+        description: `You concede ${(avgConcededInLosses - avgConcededInWins).toFixed(1)} more goals per game in losses. Defensive stability is your foundation for success.`,
+        impact: 'Critical - Prioritize defensive organization and communication'
       });
     }
     
-    // Pass accuracy in different results
+    // POSSESSION CONTROL
     const avgPassInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / wins.length : 0;
     const avgPassInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / losses.length : 0;
     
-    if (wins.length > 0 && losses.length > 0 && avgPassInWins > avgPassInLosses + 10) {
+    if (wins.length > 0 && losses.length > 0 && avgPassInWins > avgPassInLosses + 12) {
       insights.push({
-        title: 'Possession Control Matters',
-        description: `Pass success rate is ${(avgPassInWins - avgPassInLosses).toFixed(1)}% higher in wins. Better ball retention leads to better results.`,
-        impact: 'Medium - Focus on technical skills and ball control'
+        title: '⚽ Possession = Control',
+        description: `Pass accuracy is ${(avgPassInWins - avgPassInLosses).toFixed(1)}% higher in wins. Better ball retention leads to dictating game tempo.`,
+        impact: 'High - Work on technical skills and patient build-up play'
       });
     }
     
-    // Tackle success patterns
+    // PRESSING SUCCESS
     const avgTackleInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / wins.length : 0;
     const avgTackleInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / losses.length : 0;
     
-    if (wins.length > 0 && losses.length > 0 && avgTackleInWins > avgTackleInLosses + 15) {
+    if (wins.length > 0 && losses.length > 0 && avgTackleInWins > avgTackleInLosses + 18) {
       insights.push({
-        title: 'Defensive Pressing Advantage',
-        description: `Tackle success rate is ${(avgTackleInWins - avgTackleInLosses).toFixed(1)}% higher in wins. Winning the ball back quickly disrupts opponents.`,
-        impact: 'Medium - Implement more organized pressing triggers'
+        title: '🔥 High Press Advantage',
+        description: `Tackle success is ${(avgTackleInWins - avgTackleInLosses).toFixed(1)}% higher in wins. Aggressive pressing disrupts opponents' rhythm.`,
+        impact: 'Medium - Implement coordinated pressing triggers and transitions'
       });
     }
     
-    // Recent form analysis
+    // MOMENTUM & FORM ANALYSIS
     const recent5 = data.slice(-5);
     const recent5Wins = recent5.filter(m => m.result === 'W').length;
     const recent5Goals = recent5.reduce((sum, m) => sum + m.goalsScored, 0);
@@ -774,53 +791,164 @@
     
     if (recent5Wins >= 4) {
       insights.push({
-        title: 'Excellent Momentum Building',
-        description: `${recent5Wins} wins in last 5 matches with ${recent5Goals} goals scored. Team confidence and tactical understanding is peaking.`,
-        impact: 'High - Maintain current approach and squad selection'
+        title: '📈 Peak Performance Phase',
+        description: `${recent5Wins} wins in last 5 matches with +${(recent5Goals - recent5Conceded)} goal difference. Team chemistry and tactical understanding are peaking.`,
+        impact: 'Positive - Maintain current formation and squad selection'
       });
     } else if (recent5Wins <= 1) {
       insights.push({
-        title: 'Form Dip Requires Response',
-        description: `Only ${recent5Wins} wins in last 5 matches. Consider tactical tweaks, formation changes, or squad rotation.`,
-        impact: 'High - Immediate tactical review needed'
+        title: '⚠️ Form Crisis Brewing',
+        description: `Only ${recent5Wins} wins in 5 games, conceding ${recent5Conceded} goals. Immediate tactical intervention required.`,
+        impact: 'Critical - Consider formation changes or squad rotation'
       });
     }
     
-    // Clean sheet analysis
+    // CLEAN SHEET ANALYSIS
     const cleanSheets = data.filter(m => m.goalsConceded === 0).length;
     const cleanSheetRate = (cleanSheets / data.length) * 100;
     
-    if (cleanSheetRate >= 40) {
+    if (cleanSheetRate >= 35) {
       insights.push({
-        title: 'Defensive Fortress',
-        description: `${cleanSheetRate.toFixed(0)}% clean sheet rate shows excellent defensive organization. Your backline is your strength.`,
-        impact: 'Medium - Build attacks from solid defensive platform'
+        title: '🏰 Defensive Fortress',
+        description: `${cleanSheetRate.toFixed(0)}% clean sheet rate demonstrates excellent defensive structure. Your backline is your biggest strength.`,
+        impact: 'Positive - Use defensive solidity as platform for counter-attacks'
       });
-    } else if (cleanSheetRate < 20) {
+    } else if (cleanSheetRate < 15) {
       insights.push({
-        title: 'Defensive Vulnerability',
-        description: `Only ${cleanSheetRate.toFixed(0)}% clean sheet rate suggests defensive issues. Focus on shape and communication.`,
-        impact: 'High - Prioritize defensive drills and positioning'
-      });
-    }
-    
-    // High-scoring game analysis  
-    const highScoringGames = data.filter(m => (m.goalsScored + m.goalsConceded) >= 4).length;
-    const highScoringRate = (highScoringGames / data.length) * 100;
-    
-    if (highScoringRate >= 30) {
-      insights.push({
-        title: 'End-to-End Football Style',
-        description: `${highScoringRate.toFixed(0)}% of games are high-scoring (4+ goals). Your team plays an open, entertaining style.`,
-        impact: 'Medium - Embrace attacking philosophy while improving defensive transitions'
+        title: '🚨 Defensive Vulnerability',
+        description: `Only ${cleanSheetRate.toFixed(0)}% clean sheets suggests systemic defensive issues. Focus on shape, positioning, and communication.`,
+        impact: 'High Priority - Defensive coaching and set-piece work needed'
       });
     }
     
-    return insights.length > 0 ? insights.slice(0, 8) : [{
-      title: 'Gathering Intelligence',
-      description: 'Continue playing matches to unlock more detailed tactical insights about your team\'s patterns.',
-      impact: 'Your tactical profile will develop with more match data'
-    }];
+    // ATTACKING PATTERNS
+    const avgGoalsPerWin = wins.length > 0 ? wins.reduce((sum, m) => sum + m.goalsScored, 0) / wins.length : 0;
+    const avgGoalsPerLoss = losses.length > 0 ? losses.reduce((sum, m) => sum + m.goalsScored, 0) / losses.length : 0;
+    
+    if (avgGoalsPerWin >= 2.5) {
+      insights.push({
+        title: '⚡ High-Octane Attack',
+        description: `You average ${avgGoalsPerWin.toFixed(1)} goals when winning. Your attacking system creates multiple chances when clicking.`,
+        impact: 'Maintain attacking tempo - create more goal-scoring opportunities'
+      });
+    } else if (avgGoalsPerLoss < 1.0 && losses.length > 2) {
+      insights.push({
+        title: '🔄 Creative Struggles',
+        description: `Averaging only ${avgGoalsPerLoss.toFixed(1)} goals in defeats. Need more creativity and movement in final third.`,
+        impact: 'Medium - Work on attacking patterns and player movement'
+      });
+    }
+    
+    // GAME MANAGEMENT
+    const comebacks = data.filter(m => m.result === 'W' && m.goalsConceded > 0).length;
+    const comebackRate = data.length > 0 ? (comebacks / data.length) * 100 : 0;
+    
+    if (comebackRate >= 20) {
+      insights.push({
+        title: '💪 Mental Resilience',
+        description: `${comebackRate.toFixed(0)}% of games feature comeback wins. Your team shows excellent mental strength under pressure.`,
+        impact: 'Positive trait - Continue building team character and belief'
+      });
+    }
+    
+    // CONSISTENCY PATTERNS
+    const passConsistency = calculateConsistency(data.map(d => d.passSuccess || 0));
+    const shotConsistency = calculateConsistency(data.map(d => d.shotSuccess || 0));
+    const tackleConsistency = calculateConsistency(data.map(d => d.tackleSuccess || 0));
+    
+    if (passConsistency > 80) {
+      insights.push({
+        title: '🎯 Passing Reliability',
+        description: `${passConsistency.toFixed(0)}% consistency in passing shows excellent technical discipline across the squad.`,
+        impact: 'Strong foundation - Use as platform for more complex tactics'
+      });
+    } else if (passConsistency < 60) {
+      insights.push({
+        title: '📊 Technical Inconsistency',
+        description: `Pass success varies significantly (${passConsistency.toFixed(0)}% consistent). Need more training on basic technique.`,
+        impact: 'Training Focus - Extra passing and technical sessions required'
+      });
+    }
+    
+    if (shotConsistency < 50) {
+      insights.push({
+        title: '🎲 Unpredictable Finishing',
+        description: `Shot conversion varies wildly between matches. Finishing is too dependent on individual moments of brilliance.`,
+        impact: 'Practice finishing patterns and composure under pressure'
+      });
+    }
+    
+    // HEAD-TO-HEAD PATTERNS
+    const bigWins = data.filter(m => m.result === 'W' && (m.goalsScored - m.goalsConceded) >= 3).length;
+    const bigWinRate = (bigWins / data.length) * 100;
+    
+    if (bigWinRate >= 15) {
+      insights.push({
+        title: '🚀 Dominant Victories',
+        description: `${bigWinRate.toFixed(0)}% of games are convincing 3+ goal wins. When you're good, you're ruthless.`,
+        impact: 'Excellent - Shows ability to kill games and maintain intensity'
+      });
+    }
+    
+    // DRAW ANALYSIS
+    const drawRate = (draws.length / data.length) * 100;
+    if (drawRate >= 25) {
+      insights.push({
+        title: '⚖️ Too Many Stalemates',
+        description: `${drawRate.toFixed(0)}% draw rate suggests difficulty closing out tight games. Need more killer instinct.`,
+        impact: 'Tactical adjustment - Work on breaking down defensive opponents'
+      });
+    }
+    
+    // RECENT TACTICAL EVOLUTION
+    if (data.length >= 10) {
+      const first5 = data.slice(0, 5);
+      const last5 = data.slice(-5);
+      const earlyPass = first5.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / 5;
+      const recentPass = last5.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / 5;
+      
+      if (recentPass > earlyPass + 10) {
+        insights.push({
+          title: '📈 Technical Evolution',
+          description: `Pass success improved by ${(recentPass - earlyPass).toFixed(1)}% over the season. Team is developing better chemistry.`,
+          impact: 'Positive trend - Continue current training methods'
+        });
+      } else if (earlyPass > recentPass + 10) {
+        insights.push({
+          title: '📉 Form Regression',
+          description: `Pass accuracy has declined by ${(earlyPass - recentPass).toFixed(1)}% recently. May indicate fatigue or tactical confusion.`,
+          impact: 'Attention needed - Review recent changes and player fitness'
+        });
+      }
+    }
+    
+    // EFFICIENCY VS VOLUME
+    const totalShots = data.reduce((sum, m) => sum + (m.goalsScored / (m.shotSuccess / 100) || 0), 0);
+    const avgShotsPerGame = totalShots / data.length;
+    
+    if (avgShotsPerGame >= 15 && avgShotsInWins >= 25) {
+      insights.push({
+        title: '🎯 Volume Shooting Strategy',
+        description: `High shot volume with quality conversion in wins. Your "spray and pray" approach works when execution improves.`,
+        impact: 'Fine-tune shot selection while maintaining attacking intent'
+      });
+    }
+    
+    // LATE GAME PATTERNS
+    // This would require minute-by-minute data, but we can infer from results
+    const narrowWins = wins.filter(m => (m.goalsScored - m.goalsConceded) === 1).length;
+    const narrowWinRate = wins.length > 0 ? (narrowWins / wins.length) * 100 : 0;
+    
+    if (narrowWinRate >= 60) {
+      insights.push({
+        title: '⏰ Clutch Performance',
+        description: `${narrowWinRate.toFixed(0)}% of wins are by single goals. Your team excels in tight, pressure situations.`,
+        impact: 'Mental strength asset - Build on clutch mentality'
+      });
+    }
+    
+    // Return top 12 most relevant insights
+    return insights.slice(0, 12);
   }
 
   // Event listeners
