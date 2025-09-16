@@ -157,7 +157,7 @@ jobs:
           conn = sqlite3.connect(DB_PATH)
           conn.row_factory = sqlite3.Row
 
-          # 1) Matches (all)
+          # 1) Enhanced Matches with aggregate data for trends
           matches = q(conn, """
             SELECT 
               m.match_id,
@@ -198,7 +198,32 @@ jobs:
             JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id != '63719'
             ORDER BY m.match_timestamp DESC
           """)
-          (out / "matches" / "all.json").write_text(json.dumps({"success": True, "count": len(matches), "matches": matches}), encoding="utf-8")
+          
+          # Enhance matches with aggregate statistics for trends
+          enhanced_matches = []
+          for m in matches:
+            mid = m["match_id"]
+            aggs = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
+            
+            our_agg = next((a for a in aggs if a['club_id'] == '63719'), {})
+            opp_agg = next((a for a in aggs if a['club_id'] != '63719'), {})
+            
+            enhanced_match = dict(m)
+            enhanced_match.update({
+                'our_shots': our_agg.get('shots', 0),
+                'our_passes_made': our_agg.get('passesmade', 0),
+                'our_pass_attempts': our_agg.get('passattempts', 0), 
+                'our_tackles_made': our_agg.get('tacklesmade', 0),
+                'our_tackle_attempts': our_agg.get('tackleattempts', 0),
+                'opp_shots': opp_agg.get('shots', 0),
+                'opp_passes_made': opp_agg.get('passesmade', 0),
+                'opp_pass_attempts': opp_agg.get('passattempts', 0),
+                'opp_tackles_made': opp_agg.get('tacklesmade', 0),
+                'opp_tackle_attempts': opp_agg.get('tackleattempts', 0)
+            })
+            enhanced_matches.append(enhanced_match)
+          
+          (out / "matches" / "all.json").write_text(json.dumps({"success": True, "count": len(enhanced_matches), "matches": enhanced_matches}), encoding="utf-8")
 
           # 2) Player rankings (pre-slice by position)
           POS = ["all","ST","AM","DM","DF","GK"]
@@ -277,7 +302,7 @@ jobs:
             )
 
           # 3) Per-match detailed files with head-to-head data
-          for m in matches:
+          for m in matches:  # Use original matches for loop
             mid = m["match_id"]
             clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
             
