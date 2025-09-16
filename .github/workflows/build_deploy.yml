@@ -96,7 +96,8 @@ jobs:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
           python - << 'PY'
-          import os, json, sqlite3, pathlib
+          import os, json, sqlite3, pathlib, math
+          from collections import defaultdict, Counter
 
           DB_PATH = os.environ["DB_PATH"]
           out = pathlib.Path("public/api")
@@ -108,11 +109,37 @@ jobs:
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in c.fetchall()]
 
+          def q1(conn, sql, args=()):
+            rows = q(conn, sql, args)
+            return rows[0] if rows else None
+
+          def safe_div(a, b):
+            return (a / b) if b else 0.0
+
+          def coeff_of_variation(values):
+            vals = [v for v in values if v is not None]
+            n = len(vals)
+            if n < 2: return 0.0
+            mean = sum(vals) / n
+            if mean == 0: return 0.0
+            var = sum((v-mean)**2 for v in vals) / (n-1)
+            return math.sqrt(var) / abs(mean)
+
+          def percentile(values, p):
+            vals = sorted(v for v in values if v is not None)
+            if not vals: return 0.0
+            k = (len(vals)-1) * (p/100)
+            f = math.floor(k); c = math.ceil(k)
+            if f == c: return float(vals[int(k)])
+            return float(vals[f]*(c-k) + vals[c]*(k-f))
+
+          def jaccard(a_set, b_set):
+            if not a_set and not b_set: return 1.0
+            inter = len(a_set & b_set)
+            union = len(a_set | b_set)
+            return safe_div(inter, union)
+
           def calculate_head_to_head(conn, our_club_id, opponent_club_id, current_match_id):
-            """Calculate head-to-head statistics between two clubs"""
-            
-            # Get all historical matches between these two clubs (excluding current match)
-            # Always query with our_club_id as the reference point
             h2h_matches = q(conn, """
               SELECT 
                 m.match_id,
@@ -129,17 +156,12 @@ jobs:
               WHERE m.match_id != ?
               ORDER BY m.match_timestamp DESC
             """, (our_club_id, opponent_club_id, current_match_id))
-            
-            # Calculate summary statistics using our_result directly
             total_played = len(h2h_matches)
             our_wins = sum(1 for m in h2h_matches if m['our_result'] in [1, 16385])
             draws = sum(1 for m in h2h_matches if m['our_result'] == 4)
             our_losses = sum(1 for m in h2h_matches if m['our_result'] in [2, 10])
-            
-            # Get opponent info from the first match (all should be same opponent)
             opponent_name = h2h_matches[0]['opponent_club_name'] if h2h_matches else 'Unknown'
             opponent_team_id = h2h_matches[0]['opponent_team_id'] if h2h_matches else 1
-            
             return {
               'summary': {
                 'played': total_played,
@@ -147,7 +169,7 @@ jobs:
                 'draws': draws,
                 'our_losses': our_losses
               },
-              'matches': h2h_matches[:10],  # Last 10 matches
+              'matches': h2h_matches[:10],
               'opponent_info': {
                 'club_name': opponent_name,
                 'team_id': opponent_team_id
@@ -157,7 +179,9 @@ jobs:
           conn = sqlite3.connect(DB_PATH)
           conn.row_factory = sqlite3.Row
 
-          # 1) Enhanced Matches with aggregate data for trends
+          # ------------------------------------------------------------
+          # 1) Enhanced Matches with aggregate data (keep existing)
+          # ------------------------------------------------------------
           matches = q(conn, """
             SELECT 
               m.match_id,
@@ -180,34 +204,19 @@ jobs:
                 WHEN mc1.result = 2 OR mc1.result = 10 THEN 'L'
                 WHEN mc1.result = 4 THEN 'D'
                 ELSE 'Unknown'
-              END as result,
-              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.goals || ')', ', ')
-               FROM match_players mp
-               WHERE mp.match_id = m.match_id AND mp.club_id = '63719' AND mp.goals > 0) as our_goalscorers,
-              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.assists || ')', ', ')
-               FROM match_players mp
-               WHERE mp.match_id = m.match_id AND mp.club_id = '63719' AND mp.assists > 0) as our_assisters,
-              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.goals || ')', ', ')
-               FROM match_players mp
-               WHERE mp.match_id = m.match_id AND mp.club_id = mc2.club_id AND mp.goals > 0) as opponent_goalscorers,
-              (SELECT GROUP_CONCAT(mp.player_name || ' (' || mp.assists || ')', ', ')
-               FROM match_players mp
-               WHERE mp.match_id = m.match_id AND mp.club_id = mc2.club_id AND mp.assists > 0) as opponent_assisters
+              END as result
             FROM matches m
             JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = '63719'
             JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id != '63719'
-            ORDER BY m.match_timestamp DESC
+            ORDER BY m.match_timestamp ASC
           """)
           
-          # Enhance matches with aggregate statistics for trends
           enhanced_matches = []
           for m in matches:
             mid = m["match_id"]
             aggs = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
-            
             our_agg = next((a for a in aggs if a['club_id'] == '63719'), {})
             opp_agg = next((a for a in aggs if a['club_id'] != '63719'), {})
-            
             enhanced_match = dict(m)
             enhanced_match.update({
                 'our_shots': our_agg.get('shots', 0),
@@ -222,13 +231,17 @@ jobs:
                 'opp_tackle_attempts': opp_agg.get('tackleattempts', 0)
             })
             enhanced_matches.append(enhanced_match)
-          
-          (out / "matches" / "all.json").write_text(json.dumps({"success": True, "count": len(enhanced_matches), "matches": enhanced_matches}), encoding="utf-8")
 
-          # 2) Player rankings (pre-slice by position)
+          (out / "matches" / "all.json").write_text(
+            json.dumps({"success": True, "count": len(enhanced_matches), "matches": enhanced_matches}),
+            encoding="utf-8"
+          )
+
+          # ------------------------------------------------------------
+          # 2) Player rankings (keep existing)
+          # ------------------------------------------------------------
           POS = ["all","ST","AM","DM","DF","GK"]
           for pos in POS:
-            # WHERE clause per tab
             where_pos = {
               "all": "",
               "ST":  "AND assigned_position = 'ST'",
@@ -237,11 +250,6 @@ jobs:
               "GK":  "AND assigned_position = 'GK'",
               "DF":  "AND assigned_position IN ('RB','LB','CB')",
             }[pos]
-
-            # SELECT column to show in the UI
-            # - 'all' shows NULL (UI can hide the column)
-            # - 'DF' collapses RB/LB/CB into the single bucket label 'DF'
-            # - others show their assigned_position as-is
             select_pos_expr = {
               "all": "NULL AS assigned_position",
               "DF":  "'DF' AS assigned_position",
@@ -250,12 +258,7 @@ jobs:
               "DM":  "assigned_position",
               "GK":  "assigned_position",
             }[pos]
-
-            # GROUP BY trailer:
-            # - nothing extra for 'all' and 'DF'
-            # - for the other tabs we keep grouping by assigned_position
             group_by_trailer = "" if pos in ("all","DF") else ", assigned_position"
-
             query = f"""
               SELECT
                 {select_pos_expr},
@@ -301,11 +304,12 @@ jobs:
               encoding="utf-8"
             )
 
-          # 3) Per-match detailed files with head-to-head data
-          for m in matches:  # Use original matches for loop
+          # ------------------------------------------------------------
+          # 3) Per-match detailed files with head-to-head (keep existing)
+          # ------------------------------------------------------------
+          for m in matches:
             mid = m["match_id"]
             clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
-            
             try:
               players = q(conn, """
                 SELECT * FROM player_match_stats_view 
@@ -318,15 +322,10 @@ jobs:
                 WHERE match_id = ?
                 ORDER BY club_id, rating DESC
               """, (mid,))
-            
             aggregates = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
-            
-            # Calculate head-to-head data
             our_club_id = '63719'
             opponent_club_id = m["opponent_club_id"]
             head_to_head = calculate_head_to_head(conn, our_club_id, opponent_club_id, mid)
-            
-            # Create detailed match file with head_to_head included
             p = out / "matches" / mid / "detailed.json"
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps({
@@ -338,8 +337,423 @@ jobs:
               "head_to_head": head_to_head
             }), encoding="utf-8")
 
+          # ------------------------------------------------------------
+          # 4) NEW: Season-level (aggregate) summary (B → H, no A)
+          # ------------------------------------------------------------
+          # Build per-match derived values internally (final output is aggregate-only)
+          # We'll use enhanced_matches created above.
+          n = len(enhanced_matches)
+          wins = sum(1 for m in enhanced_matches if m['result'] == 'W')
+          draws = sum(1 for m in enhanced_matches if m['result'] == 'D')
+          losses = sum(1 for m in enhanced_matches if m['result'] == 'L')
+          gf = sum(m['our_goals'] for m in enhanced_matches)
+          ga = sum(m['opponent_goals'] for m in enhanced_matches)
+          goal_diff = gf - ga
+          points = 3*wins + 1*draws
+          ppg = safe_div(points, n)
+
+          # Per-match conversion stats
+          pass_pct_per_match = []
+          tackle_pct_per_match = []
+          shot_pct_per_match = []
+          save_pct_per_match = []
+          pdo_per_match = []
+
+          # Identity proxies
+          poss_share_per_match = []
+          field_tilt_per_match = []
+
+          # Team GF/GA per match arrays
+          gf_per_match = []
+          ga_per_match = []
+
+          # Result margin buckets
+          margin_counts = Counter()
+          # One-goal game edge
+          one_goal_games = 0
+          one_goal_wins = 0
+
+          # Lineup stability: need XI per match for our club
+          roster_by_match = {}
+          for m in enhanced_matches:
+            players = q(conn, """
+              SELECT player_id FROM player_match_stats_view
+              WHERE match_id = ? AND club_id = '63719'
+            """, (m['match_id'],))
+            roster_by_match[m['match_id']] = set(p['player_id'] for p in players)
+
+          lineup_stability_scores = []
+          prev_set = None
+
+          # Build all per-match derived fields (internal only)
+          for m in enhanced_matches:
+            # Conversions
+            pass_pct = safe_div(m['our_passes_made'], m['our_pass_attempts']) * 100
+            tack_pct = safe_div(m['our_tackles_made'], m['our_tackle_attempts']) * 100
+            shot_pct = safe_div(m['our_goals'], m['our_shots']) * 100
+            save_pct = 1.0 - safe_div(m['opponent_goals'], m['opp_shots'])
+            save_pct *= 100
+            pass_pct_per_match.append(pass_pct)
+            tackle_pct_per_match.append(tack_pct)
+            shot_pct_per_match.append(shot_pct)
+            save_pct_per_match.append(save_pct)
+            pdo_per_match.append((shot_pct + save_pct))
+
+            # Identity
+            poss_share = safe_div(m['our_pass_attempts'], (m['our_pass_attempts'] + m['opp_pass_attempts']))
+            field_tilt = safe_div(m['our_shots'], (m['our_shots'] + m['opp_shots']))
+            poss_share_per_match.append(possess_share := poss_share)
+            field_tilt_per_match.append(field_tilt)
+
+            # GF/GA
+            gf_per_match.append(float(m['our_goals']))
+            ga_per_match.append(float(m['opponent_goals']))
+
+            # Margins & one-goal edge
+            margin = m['our_goals'] - m['opponent_goals']
+            if margin >= 2: margin_counts['win_by_2plus'] += 1
+            elif margin == 1: margin_counts['win_by_1'] += 1
+            elif margin == 0: margin_counts['draw'] += 1
+            elif margin == -1: margin_counts['loss_by_1'] += 1
+            else: margin_counts['loss_by_2plus'] += 1
+
+            if abs(margin) == 1:
+              one_goal_games += 1
+              if margin == 1: one_goal_wins += 1
+
+            # Lineup stability
+            curr_set = roster_by_match.get(m['match_id'], set())
+            if prev_set is not None:
+              lineup_stability_scores.append(jaccard(prev_set, curr_set))
+            prev_set = curr_set
+
+          # Overall identity metrics
+          poss_mean = (sum(poss_share_per_match)/n) if n else 0.0
+          poss_std  = (coeff_of_variation(poss_share_per_match) * poss_mean) if n else 0.0
+          tilt_mean = (sum(field_tilt_per_match)/n) if n else 0.0
+          tilt_std  = (coeff_of_variation(field_tilt_per_match) * tilt_mean) if n else 0.0
+
+          # Style index (build-up vs direct): z(passes per match) - z(shots per match)
+          # Use per-match totals for our team
+          our_pass_attempts_list = [m['our_pass_attempts'] for m in enhanced_matches]
+          our_shots_list = [m['our_shots'] for m in enhanced_matches]
+          def zize(vals):
+            vals = list(vals)
+            if not vals: return [0.0]
+            mean = sum(vals)/len(vals)
+            var = sum((v-mean)**2 for v in vals)/len(vals) if len(vals)>0 else 0.0
+            sd = math.sqrt(var)
+            return [(v-mean)/sd if sd>0 else 0.0 for v in vals]
+          z_pass = zize(our_pass_attempts_list)
+          z_shot = zize(our_shots_list)
+          style_index = sum((zp - zs) for zp, zs in zip(z_pass, z_shot))/len(z_pass) if z_pass else 0.0
+
+          # Efficiency funnel (season-level)
+          total_passes_made = sum(m['our_passes_made'] for m in enhanced_matches)
+          total_pass_attempts = sum(m['our_pass_attempts'] for m in enhanced_matches)
+          total_tackles_made = sum(m['our_tackles_made'] for m in enhanced_matches)
+          total_tackle_attempts = sum(m['our_tackle_attempts'] for m in enhanced_matches)
+          total_shots = sum(m['our_shots'] for m in enhanced_matches)
+          total_opp_shots = sum(m['opp_shots'] for m in enhanced_matches)
+
+          season_pass_pct = safe_div(total_passes_made, total_pass_attempts)*100
+          season_tackle_pct = safe_div(total_tackles_made, total_tackle_attempts)*100
+          season_shot_pct = safe_div(gf, total_shots)*100
+          season_save_pct = (1.0 - safe_div(ga, total_opp_shots))*100 if total_opp_shots>0 else 0.0
+
+          pdo_mean = (season_shot_pct + season_save_pct)
+          pdo_p10  = percentile(pdo_per_match, 10)
+          pdo_p90  = percentile(pdo_per_match, 90)
+
+          # Outcome profile
+          scoreline_dist = {k: safe_div(v, n)*100 for k, v in margin_counts.items()}
+          clean_sheet_rate = safe_div(sum(1 for m in enhanced_matches if m['opponent_goals']==0), n)*100
+          two_plus_goals_rate = safe_div(sum(1 for m in enhanced_matches if m['our_goals']>=2), n)*100
+          one_goal_edge = safe_div(one_goal_wins, one_goal_games)*100 if one_goal_games>0 else 0.0
+
+          # Consistency (CV%)
+          cv_pass = coeff_of_variation(pass_pct_per_match)*100
+          cv_shot = coeff_of_variation(shot_pct_per_match)*100
+          cv_tackle = coeff_of_variation(tackle_pct_per_match)*100
+          cv_gf = coeff_of_variation(gf_per_match)*100
+          cv_ga = coeff_of_variation(ga_per_match)*100
+          lineup_stability_avg = (sum(lineup_stability_scores)/len(lineup_stability_scores)*100) if lineup_stability_scores else 0.0
+
+          # Change-point detection (simple): count points where 5-game rolling mean differs
+          # from previous 10-game mean by >= 5 percentage points for pass/shot/tackle.
+          def rolling(values, window):
+            out_r = []
+            for i in range(len(values)):
+              s=max(0,i-window+1); out_r.append(sum(values[s:i+1])/(i-s+1))
+            return out_r
+          change_point_count = 0
+          for series in (pass_pct_per_match, shot_pct_per_match, tackle_pct_per_match):
+            if len(series)>=16:
+              roll5 = rolling(series, 5)
+              for i in range(15, len(series)):
+                prev10 = series[max(0,i-14):i-4]  # 10 items ending 5 back
+                if len(prev10)==10:
+                  mean_prev10 = sum(prev10)/10
+                  if abs(roll5[i] - mean_prev10) >= 5.0:
+                    change_point_count += 1
+
+          # Splits: by match_type
+          # We'll compute: win_rate, goal_diff_per_game, pass%, shot% per type
+          def type_metrics(type_name):
+            mm = [m for m in enhanced_matches if (m['match_type']==type_name)]
+            if not mm: return {"count":0}
+            n2=len(mm)
+            w2=sum(1 for m in mm if m['result']=='W')
+            d2=sum(1 for m in mm if m['result']=='D')
+            gf2=sum(m['our_goals'] for m in mm); ga2=sum(m['opponent_goals'] for m in mm)
+            aggs = {
+              'count': n2,
+              'win_rate': safe_div(w2, n2)*100,
+              'goal_diff_per_game': safe_div((gf2-ga2), n2)
+            }
+            # pass/shot % using totals
+            pm = sum(m['our_passes_made'] for m in mm); pa = sum(m['our_pass_attempts'] for m in mm)
+            sh = sum(m['our_shots'] for m in mm)
+            aggs['pass_pct'] = safe_div(pm, pa)*100
+            aggs['shot_pct'] = safe_div(gf2, sh)*100
+            return aggs
+
+          match_types = [r['match_type'] for r in q(conn, "SELECT DISTINCT match_type FROM match_clubs WHERE club_id='63719'")]
+          splits_by_type = {str(t): type_metrics(t) for t in match_types}
+
+          # Splits: by opponent archetype (aggregated vs-us behavior)
+          # Define archetypes using shares vs us on a per-match basis; then aggregate our outcomes.
+          def archetype_buckets():
+            buckets = {
+              'opp_high_possession': [],
+              'opp_low_possession': [],
+              'opp_high_shots': [],
+              'opp_low_shots': []
+            }
+            for m in enhanced_matches:
+              opp_poss_share = safe_div(m['opp_pass_attempts'], (m['our_pass_attempts'] + m['opp_pass_attempts']))
+              opp_shot_share = safe_div(m['opp_shots'], (m['our_shots'] + m['opp_shots']))
+              # thresholds: 0.55
+              if opp_poss_share >= 0.55: buckets['opp_high_possession'].append(m)
+              else: buckets['opp_low_possession'].append(m)
+              if opp_shot_share >= 0.55: buckets['opp_high_shots'].append(m)
+              else: buckets['opp_low_shots'].append(m)
+            def pack(ms):
+              if not ms: return {'count':0}
+              n3=len(ms)
+              w3=sum(1 for x in ms if x['result']=='W')
+              gf3=sum(x['our_goals'] for x in ms); ga3=sum(x['opponent_goals'] for x in ms)
+              field_tilt_mean_local = safe_div(sum(safe_div(x['our_shots'], (x['our_shots']+x['opp_shots'])) for x in ms), n3)
+              return {
+                'count': n3,
+                'win_rate': safe_div(w3,n3)*100,
+                'gd_per_game': safe_div(gf3-ga3, n3),
+                'field_tilt_mean': field_tilt_mean_local
+              }
+            return {k: pack(v) for k, v in buckets.items()}
+          splits_by_archetype = archetype_buckets()
+
+          # Splits: by period (early/mid/late thirds)
+          thirds = {'early': [], 'mid': [], 'late': []}
+          if n:
+            cut1 = n//3
+            cut2 = (2*n)//3
+            for i, m in enumerate(enhanced_matches):
+              k = 'early' if i < cut1 else ('mid' if i < cut2 else 'late')
+              thirds[k].append(m)
+          def pack_period(ms):
+            if not ms: return {'count':0}
+            n4=len(ms)
+            w4=sum(1 for x in ms if x['result']=='W')
+            d4=sum(1 for x in ms if x['result']=='D')
+            gf4=sum(x['our_goals'] for x in ms); ga4=sum(x['opponent_goals'] for x in ms)
+            pass_pct4 = safe_div(sum(x['our_passes_made'] for x in ms), sum(x['our_pass_attempts'] for x in ms))*100
+            shot_pct4 = safe_div(gf4, sum(x['our_shots'] for x in ms))*100
+            return {
+              'count': n4,
+              'win_rate': safe_div(w4, n4)*100,
+              'goal_diff_per_game': safe_div((gf4-ga4), n4),
+              'pass_pct': pass_pct4,
+              'shot_pct': shot_pct4
+            }
+          splits_by_period = {k: pack_period(v) for k,v in thirds.items()}
+
+          # Head-to-head (aggregate) summary for top opponents by count
+          opp_counter = Counter(m['opponent_team_id'] for m in enhanced_matches)
+          top_opponents = [tid for tid,_ in opp_counter.most_common(10)]
+          # Season baselines for deltas
+          season_pass_pct_baseline = season_pass_pct
+          season_shot_pct_baseline = season_shot_pct
+          h2h_summary = []
+          for tid in top_opponents:
+            mm = [m for m in enhanced_matches if m['opponent_team_id']==tid]
+            if not mm: continue
+            name = mm[0]['opponent_club_name']
+            gg = len(mm)
+            w = sum(1 for x in mm if x['result']=='W')
+            d = sum(1 for x in mm if x['result']=='D')
+            gf_ = sum(x['our_goals'] for x in mm); ga_ = sum(x['opponent_goals'] for x in mm)
+            pass_pct_h2h = safe_div(sum(x['our_passes_made'] for x in mm), sum(x['our_pass_attempts'] for x in mm))*100
+            shot_pct_h2h = safe_div(gf_, sum(x['our_shots'] for x in mm))*100
+            h2h_summary.append({
+              'opponent_team_id': tid,
+              'opponent_name': name,
+              'games': gg,
+              'w': w, 'd': d, 'l': gg-w-d,
+              'gd_per_game': safe_div((gf_-ga_), gg),
+              'pass_delta_vs_season': (pass_pct_h2h - season_pass_pct_baseline),
+              'shot_delta_vs_season': (shot_pct_h2h - season_shot_pct_baseline)
+            })
+
+          # Squad impact: with/without + top pairs
+          # Build presence map per match for our players
+          match_players = {}
+          all_player_ids = set()
+          for m in enhanced_matches:
+            rows = q(conn, """
+              SELECT player_id, player_name, goals, assists
+              FROM player_match_stats_view
+              WHERE match_id = ? AND club_id = '63719'
+            """, (m['match_id'],))
+            match_players[m['match_id']] = rows
+            all_player_ids.update(r['player_id'] for r in rows)
+
+          # Season aggregates needed for with/without
+          total_pass_made = sum(m['our_passes_made'] for m in enhanced_matches)
+          total_pass_attempts = sum(m['our_pass_attempts'] for m in enhanced_matches)
+          total_shots_season = sum(m['our_shots'] for m in enhanced_matches)
+
+          # Prepare per-match quick lookups
+          match_pass_made = {m['match_id']: m['our_passes_made'] for m in enhanced_matches}
+          match_pass_att  = {m['match_id']: m['our_pass_attempts'] for m in enhanced_matches}
+          match_shots     = {m['match_id']: m['our_shots'] for m in enhanced_matches}
+          match_gf        = {m['match_id']: m['our_goals'] for m in enhanced_matches}
+          match_result    = {m['match_id']: m['result'] for m in enhanced_matches}
+
+          with_without = []
+          # Only consider players with at least 5 appearances
+          min_apps = 5
+          # Build set of matches each player played
+          player_matches = defaultdict(set)
+          player_names = {}
+          for mid, rows in match_players.items():
+            for r in rows:
+              player_matches[r['player_id']].add(mid)
+              player_names[r['player_id']] = r['player_name']
+
+          all_match_ids = set(m['match_id'] for m in enhanced_matches)
+          for pid, mids_with in player_matches.items():
+            if len(mids_with) < min_apps: continue
+            mids_without = list(all_match_ids - mids_with)
+            mids_with = list(mids_with)
+
+            def agg_team(metrics_mids):
+              if not metrics_mids: 
+                return 0.0, 0.0, 0.0
+              n_local = len(metrics_mids)
+              w_local = sum(1 for mm in metrics_mids if match_result[mm]=='W')
+              gf_local = sum(match_gf[mm] for mm in metrics_mids)
+              pass_made_local = sum(match_pass_made[mm] for mm in metrics_mids)
+              pass_att_local = sum(match_pass_att[mm] for mm in metrics_mids)
+              win_pct = safe_div(w_local, n_local)*100
+              pass_pct_loc = safe_div(pass_made_local, pass_att_local)*100
+              gls_pg = safe_div(gf_local, n_local)
+              return win_pct, pass_pct_loc, gls_pg
+
+            win_w, pass_w, gpg_w = agg_team(mids_with)
+            win_wo, pass_wo, gpg_wo = agg_team(mids_without)
+
+            with_without.append({
+              'player_id': pid,
+              'player_name': player_names.get(pid, str(pid)),
+              'matches_with': len(mids_with),
+              'matches_without': len(mids_without),
+              'delta_win_pct': (win_w - win_wo),
+              'delta_pass_pct': (pass_w - pass_wo),
+              'delta_goals_for_per_game': (gpg_w - gpg_wo)
+            })
+
+          # Top chemistry pairs (by goal contributions per game when both play)
+          pair_stats = defaultdict(lambda: {'matches':0, 'goals':0, 'assists':0})
+          for mid, rows in match_players.items():
+            ids = [r['player_id'] for r in rows]
+            contrib = {r['player_id']: (r['goals'] or 0) + (r['assists'] or 0) for r in rows}
+            # build all unordered pairs in this match
+            for i in range(len(ids)):
+              for j in range(i+1, len(ids)):
+                a, b = sorted((ids[i], ids[j]))
+                pair_stats[(a,b)]['matches'] += 1
+                pair_stats[(a,b)]['goals'] += (contrib.get(a,0) + contrib.get(b,0))
+          top_pairs = []
+          for (a,b), st in pair_stats.items():
+            if st['matches'] < 5:  # minimum together appearances
+              continue
+            top_pairs.append({
+              'player1_id': a,
+              'player2_id': b,
+              'pair_name': f"{player_names.get(a,'?')} + {player_names.get(b,'?')}",
+              'matches_together': st['matches'],
+              'goal_contrib_per_game': safe_div(st['goals'], st['matches'])
+            })
+          top_pairs.sort(key=lambda x: x['goal_contrib_per_game'], reverse=True)
+          top_pairs = top_pairs[:10]
+
+          season_summary = {
+            "success": True,
+            "season_totals": {
+              "games": n, "wins": wins, "draws": draws, "losses": losses,
+              "goals_for": gf, "goals_against": ga, "goal_diff": goal_diff,
+              "points": points, "ppg": ppg
+            },
+            "identity": {
+              "style_index": style_index,
+              "possession_share_mean": poss_mean,
+              "possession_share_std": poss_std,
+              "field_tilt_mean": tilt_mean,
+              "field_tilt_std": tilt_std
+            },
+            "efficiency": {
+              "pass_pct": season_pass_pct,
+              "tackle_pct": season_tackle_pct,
+              "shot_pct": season_shot_pct,
+              "save_pct": season_save_pct,
+              "pdo_mean": pdo_mean,
+              "pdo_p10": pdo_p10,
+              "pdo_p90": pdo_p90
+            },
+            "outcome_profile": {
+              "scoreline_dist": scoreline_dist,
+              "clean_sheet_rate": clean_sheet_rate,
+              "two_plus_goals_rate": two_plus_goals_rate,
+              "one_goal_edge": one_goal_edge
+            },
+            "consistency": {
+              "cv_pass_pct": cv_pass,
+              "cv_shot_pct": cv_shot,
+              "cv_tackle_pct": cv_tackle,
+              "cv_gf": cv_gf,
+              "cv_ga": cv_ga,
+              "lineup_stability_avg": lineup_stability_avg,
+              "change_point_count": change_point_count
+            },
+            "splits": {
+              "by_match_type": splits_by_type,
+              "by_opponent_archetype": splits_by_archetype,
+              "by_period": splits_by_period
+            },
+            "head_to_head_summary": h2h_summary,
+            "squad_impact": {
+              "with_without": sorted(with_without, key=lambda x: (abs(x['delta_win_pct']), abs(x['delta_pass_pct']), abs(x['delta_goals_for_per_game'])), reverse=True)[:25],
+              "top_pairs": top_pairs
+            }
+          }
+
+          (out / "season").mkdir(parents=True, exist_ok=True)
+          (out / "season" / "summary.json").write_text(json.dumps(season_summary), encoding="utf-8")
+
           conn.close()
           PY
+
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
