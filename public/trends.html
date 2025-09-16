@@ -44,11 +44,15 @@
   .control-group{display:flex;flex-direction:column;gap:6px}
   .control-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
-  .checkbox-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;cursor:pointer;transition:all .2s}
-  .checkbox-item:hover{border-color:var(--rail)}
-  .checkbox-item.active{background:var(--rail);color:#111827;border-color:var(--rail-dark)}
+  .checkbox-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;cursor:pointer;transition:all .2s;user-select:none}
+  .checkbox-item:hover{border-color:var(--active-br)}
+  .checkbox-item.active{background:var(--active-bg);color:var(--active-tx);border-color:var(--active-br)}
   .checkbox-item input{display:none}
   .stat-color{width:12px;height:12px;border-radius:2px;margin-right:4px}
+
+  /* Match Count Input */
+  .match-count-input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;width:80px}
+  .match-count-controls{display:flex;gap:8px;align-items:center}
 
   /* Chart Container */
   .chart-container{position:relative;height:400px;background:var(--match-bg);border-radius:8px;padding:16px}
@@ -71,14 +75,20 @@
   .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .stat-trend{font-size:11px;color:var(--muted);margin-top:4px}
 
-  /* Correlation Matrix */
-  .correlation-matrix{display:grid;grid-template-columns:120px repeat(4,1fr);gap:2px;background:var(--line);border-radius:8px;overflow:hidden}
-  .matrix-cell{background:var(--match-bg);padding:12px 8px;text-align:center;font-size:11px}
+  /* Enhanced Correlation Matrix */
+  .correlation-matrix{display:grid;grid-template-columns:140px repeat(6,1fr);gap:2px;background:var(--line);border-radius:8px;overflow:hidden;margin-bottom:16px}
+  .matrix-cell{background:var(--match-bg);padding:10px 6px;text-align:center;font-size:11px;font-weight:500}
   .matrix-header{background:var(--bg);font-weight:600;color:var(--text)}
-  .matrix-value{font-weight:500}
+  .matrix-value{font-weight:600}
   .correlation-high{background:var(--win);color:#fff}
   .correlation-medium{background:var(--draw);color:#111827}
   .correlation-low{background:var(--loss);color:#fff}
+  .correlation-neutral{background:var(--muted);color:#fff}
+
+  /* Correlation Legend */
+  .correlation-legend{display:flex;justify-content:center;gap:16px;margin-bottom:12px;font-size:11px}
+  .legend-item{display:flex;align-items:center;gap:4px}
+  .legend-color{width:12px;height:12px;border-radius:2px}
 
   /* Tactical Insights */
   .insights-list{display:flex;flex-direction:column;gap:12px}
@@ -108,8 +118,8 @@
     .chart-controls{flex-direction:column}
     .checkbox-group{justify-content:center}
     .stats-grid{grid-template-columns:repeat(2,1fr)}
-    .correlation-matrix{grid-template-columns:80px repeat(4,1fr);font-size:10px}
-    .matrix-cell{padding:8px 4px}
+    .correlation-matrix{grid-template-columns:100px repeat(6,1fr);font-size:10px}
+    .matrix-cell{padding:6px 3px}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -144,36 +154,34 @@
           <div class="control-group">
             <label class="control-label">Metrics to Display</label>
             <div class="checkbox-group" id="metricControls">
-              <label class="checkbox-item active" data-metric="shotSuccess">
-                <input type="checkbox" checked>
-                <div class="stat-color" style="background:#ef4444"></div>
-                Shot Success %
-              </label>
-              <label class="checkbox-item active" data-metric="passSuccess">
-                <input type="checkbox" checked>
+              <div class="checkbox-item active" data-metric="passSuccess">
                 <div class="stat-color" style="background:#3b82f6"></div>
                 Pass Success %
-              </label>
-              <label class="checkbox-item active" data-metric="tackleSuccess">
-                <input type="checkbox" checked>
+              </div>
+              <div class="checkbox-item active" data-metric="tackleSuccess">
                 <div class="stat-color" style="background:#f59e0b"></div>
                 Tackle Success %
-              </label>
-              <label class="checkbox-item active" data-metric="resultPoints">
-                <input type="checkbox" checked>
+              </div>
+              <div class="checkbox-item active" data-metric="resultPoints">
                 <div class="stat-color" style="background:#22c55e"></div>
                 Result Points
-              </label>
+              </div>
+              <div class="checkbox-item" data-metric="goalsScored">
+                <div class="stat-color" style="background:#ef4444"></div>
+                Goals Scored
+              </div>
+              <div class="checkbox-item" data-metric="goalsConceded">
+                <div class="stat-color" style="background:#8b5cf6"></div>
+                Goals Conceded
+              </div>
             </div>
           </div>
           <div class="control-group">
-            <label class="control-label">Smoothing</label>
-            <select id="smoothingSelect" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px">
-              <option value="0">Raw Data</option>
-              <option value="3">3-Match Average</option>
-              <option value="5" selected>5-Match Average</option>
-              <option value="10">10-Match Average</option>
-            </select>
+            <label class="control-label">Match Count</label>
+            <div class="match-count-controls">
+              <input type="number" id="matchCountInput" class="match-count-input" value="20" min="5" max="999">
+              <button id="showAllMatches" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Show All</button>
+            </div>
           </div>
         </div>
         
@@ -196,30 +204,49 @@
         </div>
       </div>
 
-      <!-- Performance Correlation Matrix -->
+      <!-- Enhanced Performance Correlation Matrix -->
       <div class="section-card">
-        <h2 class="section-title">🎯 Performance Correlation Matrix</h2>
-        <p class="section-subtitle">Which metrics correlate strongest with match wins</p>
+        <h2 class="section-title">🎯 Performance Correlation Analysis</h2>
+        <p class="section-subtitle">How different metrics relate to each other and match outcomes</p>
+        
+        <div class="correlation-legend">
+          <div class="legend-item">
+            <div class="legend-color correlation-high"></div>
+            <span>Strong (70%+)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color correlation-medium"></div>
+            <span>Moderate (40-69%)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color correlation-low"></div>
+            <span>Weak (0-39%)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color correlation-neutral"></div>
+            <span>Negative</span>
+          </div>
+        </div>
         
         <div id="correlationMatrix" class="correlation-matrix">
-          <div class="loading">Calculating correlations...</div>
+          <div class="loading" style="grid-column:span 7;">Calculating correlations...</div>
         </div>
       </div>
 
       <!-- Consistency Tracker -->
       <div class="section-card">
         <h2 class="section-title">📊 Performance Consistency</h2>
-        <p class="section-subtitle">How reliable is each performance metric</p>
+        <p class="section-subtitle">How reliable and predictable each performance metric is</p>
         
         <div id="consistencyBars" class="consistency-bars">
           <div class="loading">Analyzing consistency patterns...</div>
         </div>
       </div>
 
-      <!-- Tactical Insights -->
+      <!-- Enhanced Tactical Insights -->
       <div class="section-card">
         <h2 class="section-title">🧠 Tactical Insights</h2>
-        <p class="section-subtitle">Data-driven observations about your team's patterns</p>
+        <p class="section-subtitle">Data-driven observations about your team's patterns and opportunities</p>
         
         <div id="tacticalInsights" class="insights-list">
           <div class="loading">Generating insights...</div>
@@ -233,15 +260,17 @@
   const OUR_CLUB_ID = '63719';
   const API_BASE = '';
   
-  let matchesData = [];
+  let allMatchesData = [];
+  let displayedMatchesData = [];
   let trendsChart = null;
   
   // Chart colors
   const COLORS = {
-    shotSuccess: '#ef4444',
     passSuccess: '#3b82f6', 
     tackleSuccess: '#f59e0b',
-    resultPoints: '#22c55e'
+    resultPoints: '#22c55e',
+    goalsScored: '#ef4444',
+    goalsConceded: '#8b5cf6'
   };
 
   async function getJSON(path){
@@ -250,62 +279,69 @@
     return res.json();
   }
 
-  function calculateMovingAverage(data, window) {
-    if (window <= 1) return data;
-    
-    return data.map((_, index, array) => {
-      const start = Math.max(0, index - Math.floor(window / 2));
-      const end = Math.min(array.length, start + window);
-      const slice = array.slice(start, end);
-      return slice.reduce((sum, val) => sum + val, 0) / slice.length;
-    });
-  }
-
   function processMatchData(matches) {
     return matches.map((match, index) => {
       // Calculate efficiency metrics
-      const shotSuccess = match.our_goals && match.our_shots ? 
-        (parseInt(match.our_goals) / parseInt(match.our_shots)) * 100 : 0;
-      
       const passSuccess = match.our_passes_made && match.our_pass_attempts ?
         (parseInt(match.our_passes_made) / parseInt(match.our_pass_attempts)) * 100 : 0;
         
       const tackleSuccess = match.our_tackles_made && match.our_tackle_attempts ?
         (parseInt(match.our_tackles_made) / parseInt(match.our_tackle_attempts)) * 100 : 0;
         
+      // Result points: Win = 100%, Draw = 50%, Loss = 0%
       const resultPoints = match.result === 'W' ? 100 : (match.result === 'D' ? 50 : 0);
+      
+      const goalsScored = parseInt(match.our_goals) || 0;
+      const goalsConceded = parseInt(match.opponent_goals) || 0;
       
       return {
         matchNumber: index + 1,
         opponent: match.opponent_club_name,
         date: match.match_date,
         result: match.result,
-        shotSuccess,
         passSuccess, 
         tackleSuccess,
         resultPoints,
-        ourGoals: parseInt(match.our_goals) || 0,
-        oppGoals: parseInt(match.opponent_goals) || 0
+        goalsScored,
+        goalsConceded,
+        ourGoals: goalsScored,
+        oppGoals: goalsConceded
       };
     });
+  }
+
+  function updateDisplayedMatches() {
+    const matchCount = parseInt(document.getElementById('matchCountInput').value);
+    const totalMatches = allMatchesData.length;
+    
+    if (matchCount >= totalMatches) {
+      displayedMatchesData = [...allMatchesData];
+    } else {
+      displayedMatchesData = allMatchesData.slice(-matchCount);
+    }
+    
+    if (displayedMatchesData.length > 0) {
+      createTrendsChart(displayedMatchesData);
+      renderFormStrip(displayedMatchesData);
+      renderKeyStats(displayedMatchesData);
+      renderCorrelationMatrix(displayedMatchesData);
+      renderConsistencyBars(displayedMatchesData);
+      renderTacticalInsights(displayedMatchesData);
+    }
   }
 
   function createTrendsChart(data) {
     const ctx = document.getElementById('trendsChart').getContext('2d');
     
     const datasets = [];
-    const smoothing = parseInt(document.getElementById('smoothingSelect').value);
     
-    // Create datasets for each metric
-    ['shotSuccess', 'passSuccess', 'tackleSuccess', 'resultPoints'].forEach(metric => {
+    // Create datasets for each active metric
+    ['passSuccess', 'tackleSuccess', 'resultPoints', 'goalsScored', 'goalsConceded'].forEach(metric => {
       const checkbox = document.querySelector(`[data-metric="${metric}"]`);
       if (checkbox && checkbox.classList.contains('active')) {
-        const rawData = data.map(d => d[metric]);
-        const smoothedData = calculateMovingAverage(rawData, smoothing);
-        
         datasets.push({
-          label: metric.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
-          data: smoothedData,
+          label: getMetricLabel(metric),
+          data: data.map(d => d[metric]),
           borderColor: COLORS[metric],
           backgroundColor: COLORS[metric] + '20',
           borderWidth: 2,
@@ -353,7 +389,7 @@
             callbacks: {
               title: function(context) {
                 const match = data[context[0].dataIndex];
-                return `${match.opponent} (${match.date})`;
+                return `vs ${match.opponent} (${match.date})`;
               },
               afterTitle: function(context) {
                 const match = data[context[0].dataIndex];
@@ -378,11 +414,9 @@
             ticks: {
               color: '#a1a1aa',
               callback: function(value) {
-                return value + '%';
+                return value.toFixed(0);
               }
-            },
-            min: 0,
-            max: 100
+            }
           }
         },
         interaction: {
@@ -394,12 +428,23 @@
     });
   }
 
+  function getMetricLabel(metric) {
+    const labels = {
+      passSuccess: 'Pass Success %',
+      tackleSuccess: 'Tackle Success %', 
+      resultPoints: 'Result Points',
+      goalsScored: 'Goals Scored',
+      goalsConceded: 'Goals Conceded'
+    };
+    return labels[metric] || metric;
+  }
+
   function renderFormStrip(data) {
     const recent = data.slice(-10);
     const container = document.getElementById('formStrip');
     
     container.innerHTML = recent.map(match => 
-      `<div class="form-match ${match.result.toLowerCase()}" title="${match.opponent}: ${match.ourGoals}-${match.oppGoals}">
+      `<div class="form-match ${match.result.toLowerCase()}" title="vs ${match.opponent}: ${match.ourGoals}-${match.oppGoals}">
         ${match.result}
       </div>`
     ).join('');
@@ -408,24 +453,26 @@
   function renderKeyStats(data) {
     const container = document.getElementById('keyStats');
     
+    if (data.length === 0) {
+      container.innerHTML = '<div class="loading">No match data available</div>';
+      return;
+    }
+    
     // Calculate averages and trends
-    const avgShots = data.reduce((sum, m) => sum + m.shotSuccess, 0) / data.length;
-    const avgPasses = data.reduce((sum, m) => sum + m.passSuccess, 0) / data.length; 
-    const avgTackles = data.reduce((sum, m) => sum + m.tackleSuccess, 0) / data.length;
+    const avgPasses = data.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / data.length;
+    const avgTackles = data.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / data.length;
     const winRate = (data.filter(m => m.result === 'W').length / data.length) * 100;
+    const avgGoalsFor = data.reduce((sum, m) => sum + (m.goalsScored || 0), 0) / data.length;
+    const avgGoalsAgainst = data.reduce((sum, m) => sum + (m.goalsConceded || 0), 0) / data.length;
     
     // Recent form vs overall
     const recent5 = data.slice(-5);
-    const recent5WinRate = (recent5.filter(m => m.result === 'W').length / recent5.length) * 100;
+    const recent5WinRate = recent5.length > 0 ? (recent5.filter(m => m.result === 'W').length / recent5.length) * 100 : 0;
     const formTrend = recent5WinRate > winRate ? 'positive' : (recent5WinRate < winRate ? 'negative' : 'neutral');
     
     const currentStreak = calculateCurrentStreak(data);
     
     container.innerHTML = `
-      <div class="stat-item">
-        <div class="stat-value">${avgShots.toFixed(1)}%</div>
-        <div class="stat-label">Shot Success</div>
-      </div>
       <div class="stat-item">
         <div class="stat-value">${avgPasses.toFixed(1)}%</div>
         <div class="stat-label">Pass Success</div>
@@ -435,19 +482,32 @@
         <div class="stat-label">Tackle Success</div>
       </div>
       <div class="stat-item">
+        <div class="stat-value">${avgGoalsFor.toFixed(1)}</div>
+        <div class="stat-label">Goals Per Game</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${avgGoalsAgainst.toFixed(1)}</div>
+        <div class="stat-label">Goals Against</div>
+      </div>
+      <div class="stat-item">
         <div class="stat-value">${winRate.toFixed(1)}%</div>
         <div class="stat-label">Win Rate</div>
-        <div class="stat-trend">Season Average</div>
+        <div class="stat-trend">Overall</div>
       </div>
       <div class="stat-item">
         <div class="stat-value ${formTrend}">${recent5WinRate.toFixed(1)}%</div>
         <div class="stat-label">Recent Form</div>
-        <div class="stat-trend">Last 5 matches</div>
+        <div class="stat-trend">Last ${recent5.length} matches</div>
       </div>
       <div class="stat-item">
         <div class="stat-value ${currentStreak.type}">${currentStreak.count}</div>
         <div class="stat-label">Current Streak</div>
         <div class="stat-trend">${currentStreak.text}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${(avgGoalsFor - avgGoalsAgainst).toFixed(1)}</div>
+        <div class="stat-label">Goal Difference</div>
+        <div class="stat-trend">Per Game</div>
       </div>
     `;
   }
@@ -475,34 +535,76 @@
   function renderCorrelationMatrix(data) {
     const container = document.getElementById('correlationMatrix');
     
-    // Calculate correlations between each metric and wins
-    const metrics = ['shotSuccess', 'passSuccess', 'tackleSuccess'];
+    if (data.length < 3) {
+      container.innerHTML = '<div class="loading" style="grid-column:span 7;">Need at least 3 matches for correlation analysis</div>';
+      return;
+    }
+    
+    // Calculate correlations between metrics
+    const metrics = ['passSuccess', 'tackleSuccess', 'goalsScored', 'goalsConceded', 'resultPoints'];
     const correlations = {};
     
-    metrics.forEach(metric => {
-      const wins = data.map(d => d.result === 'W' ? 1 : 0);
-      const values = data.map(d => d[metric]);
-      correlations[metric] = calculateCorrelation(wins, values);
+    metrics.forEach(metric1 => {
+      correlations[metric1] = {};
+      metrics.forEach(metric2 => {
+        if (metric1 === metric2) {
+          correlations[metric1][metric2] = 1.0;
+        } else {
+          const values1 = data.map(d => d[metric1] || 0);
+          const values2 = data.map(d => d[metric2] || 0);
+          correlations[metric1][metric2] = calculateCorrelation(values1, values2);
+        }
+      });
     });
     
     container.innerHTML = `
       <div class="matrix-cell matrix-header"></div>
-      <div class="matrix-cell matrix-header">Shot %</div>
       <div class="matrix-cell matrix-header">Pass %</div>
       <div class="matrix-cell matrix-header">Tackle %</div>
-      <div class="matrix-cell matrix-header">Wins</div>
+      <div class="matrix-cell matrix-header">Goals For</div>
+      <div class="matrix-cell matrix-header">Goals Agst</div>
+      <div class="matrix-cell matrix-header">Result Pts</div>
       
-      <div class="matrix-cell matrix-header">Win Correlation</div>
-      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.shotSuccess)}">${(correlations.shotSuccess * 100).toFixed(0)}%</div>
-      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess)}">${(correlations.passSuccess * 100).toFixed(0)}%</div>
-      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess)}">${(correlations.tackleSuccess * 100).toFixed(0)}%</div>
-      <div class="matrix-cell matrix-value correlation-high">100%</div>
+      <div class="matrix-cell matrix-header">Pass Success %</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(1.0)}">100%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess.tackleSuccess)}">${(correlations.passSuccess.tackleSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess.goalsScored)}">${(correlations.passSuccess.goalsScored * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess.goalsConceded)}">${(correlations.passSuccess.goalsConceded * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess.resultPoints)}">${(correlations.passSuccess.resultPoints * 100).toFixed(0)}%</div>
+      
+      <div class="matrix-cell matrix-header">Tackle Success %</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess.passSuccess)}">${(correlations.tackleSuccess.passSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(1.0)}">100%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess.goalsScored)}">${(correlations.tackleSuccess.goalsScored * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess.goalsConceded)}">${(correlations.tackleSuccess.goalsConceded * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess.resultPoints)}">${(correlations.tackleSuccess.resultPoints * 100).toFixed(0)}%</div>
+      
+      <div class="matrix-cell matrix-header">Goals Scored</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsScored.passSuccess)}">${(correlations.goalsScored.passSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsScored.tackleSuccess)}">${(correlations.goalsScored.tackleSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(1.0)}">100%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsScored.goalsConceded)}">${(correlations.goalsScored.goalsConceded * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsScored.resultPoints)}">${(correlations.goalsScored.resultPoints * 100).toFixed(0)}%</div>
+      
+      <div class="matrix-cell matrix-header">Goals Conceded</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsConceded.passSuccess)}">${(correlations.goalsConceded.passSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsConceded.tackleSuccess)}">${(correlations.goalsConceded.tackleSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsConceded.goalsScored)}">${(correlations.goalsConceded.goalsScored * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(1.0)}">100%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.goalsConceded.resultPoints)}">${(correlations.goalsConceded.resultPoints * 100).toFixed(0)}%</div>
+      
+      <div class="matrix-cell matrix-header">Result Points</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.resultPoints.passSuccess)}">${(correlations.resultPoints.passSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.resultPoints.tackleSuccess)}">${(correlations.resultPoints.tackleSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.resultPoints.goalsScored)}">${(correlations.resultPoints.goalsScored * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.resultPoints.goalsConceded)}">${(correlations.resultPoints.goalsConceded * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(1.0)}">100%</div>
     `;
   }
 
   function calculateCorrelation(x, y) {
     const n = x.length;
-    if (n === 0) return 0;
+    if (n === 0 || n < 2) return 0;
     
     const sumX = x.reduce((a, b) => a + b, 0);
     const sumY = y.reduce((a, b) => a + b, 0);
@@ -513,11 +615,15 @@
     const numerator = n * sumXY - sumX * sumY;
     const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
     
-    return denominator === 0 ? 0 : numerator / denominator;
+    if (denominator === 0 || isNaN(denominator)) return 0;
+    const correlation = numerator / denominator;
+    
+    return isNaN(correlation) ? 0 : correlation;
   }
 
   function getCorrelationClass(correlation) {
     const abs = Math.abs(correlation);
+    if (correlation < -0.1) return 'correlation-neutral';
     if (abs >= 0.7) return 'correlation-high';
     if (abs >= 0.4) return 'correlation-medium';
     return 'correlation-low';
@@ -526,15 +632,21 @@
   function renderConsistencyBars(data) {
     const container = document.getElementById('consistencyBars');
     
+    if (data.length < 2) {
+      container.innerHTML = '<div class="loading">Need at least 2 matches to calculate consistency</div>';
+      return;
+    }
+    
     const metrics = [
-      { key: 'shotSuccess', name: 'Shot Success Rate', color: '#ef4444' },
       { key: 'passSuccess', name: 'Pass Success Rate', color: '#3b82f6' },
       { key: 'tackleSuccess', name: 'Tackle Success Rate', color: '#f59e0b' },
+      { key: 'goalsScored', name: 'Goals Scored', color: '#ef4444' },
+      { key: 'goalsConceded', name: 'Goals Conceded', color: '#8b5cf6' },
       { key: 'resultPoints', name: 'Match Results', color: '#22c55e' }
     ];
     
     container.innerHTML = metrics.map(metric => {
-      const values = data.map(d => d[metric]);
+      const values = data.map(d => d[metric] || 0);
       const consistency = calculateConsistency(values);
       
       return `
@@ -552,15 +664,21 @@
   }
 
   function calculateConsistency(values) {
-    if (values.length === 0) return 0;
+    if (values.length < 2) return 0;
     
-    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    // Filter out invalid values
+    const validValues = values.filter(v => typeof v === 'number' && !isNaN(v) && isFinite(v));
+    if (validValues.length < 2) return 0;
+    
+    const mean = validValues.reduce((sum, val) => sum + val, 0) / validValues.length;
+    const variance = validValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / validValues.length;
     const stdDev = Math.sqrt(variance);
     
-    // Convert to consistency percentage (lower std dev = higher consistency)
-    const maxPossibleStdDev = 50; // Reasonable max for our percentage data
-    return Math.max(0, (1 - (stdDev / maxPossibleStdDev)) * 100);
+    // Convert to consistency percentage (lower coefficient of variation = higher consistency)
+    const coefficientOfVariation = mean !== 0 ? stdDev / Math.abs(mean) : 1;
+    const consistency = Math.max(0, Math.min(100, (1 - coefficientOfVariation) * 100));
+    
+    return consistency;
   }
 
   function renderTacticalInsights(data) {
@@ -577,90 +695,151 @@
   }
 
   function generateInsights(data) {
+    if (data.length < 3) {
+      return [{
+        title: 'More Data Needed',
+        description: 'Play more matches to unlock deeper tactical insights and patterns.',
+        impact: 'Keep building your match history for better analysis'
+      }];
+    }
+    
     const insights = [];
     
-    // Win rate analysis
     const wins = data.filter(d => d.result === 'W');
     const losses = data.filter(d => d.result === 'L');
+    const draws = data.filter(d => d.result === 'D');
     
-    if (wins.length > 0 && losses.length > 0) {
-      const avgWinShots = wins.reduce((sum, m) => sum + m.shotSuccess, 0) / wins.length;
-      const avgLossShots = losses.reduce((sum, m) => sum + m.shotSuccess, 0) / losses.length;
-      
-      if (avgWinShots > avgLossShots + 5) {
-        insights.push({
-          title: 'Clinical Finishing = More Wins',
-          description: `Your shot success rate is ${(avgWinShots - avgLossShots).toFixed(1)}% higher in wins vs losses. Focus on quality over quantity in attack.`,
-          impact: 'High - Direct correlation with match results'
-        });
-      }
-      
-      const avgWinPasses = wins.reduce((sum, m) => sum + m.passSuccess, 0) / wins.length;
-      const avgLossPasses = losses.reduce((sum, m) => sum + m.passSuccess, 0) / losses.length;
-      
-      if (avgWinPasses > avgLossPasses + 10) {
-        insights.push({
-          title: 'Possession Control Key to Success',
-          description: `Pass success rate is ${(avgWinPasses - avgLossPasses).toFixed(1)}% higher in wins. Better ball retention leads to better results.`,
-          impact: 'Medium - Foundation for controlling games'
-        });
-      }
+    // Goal scoring patterns
+    const avgGoalsInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + m.goalsScored, 0) / wins.length : 0;
+    const avgGoalsInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + m.goalsScored, 0) / losses.length : 0;
+    
+    if (wins.length > 0 && avgGoalsInWins >= 2) {
+      insights.push({
+        title: 'Strong Attacking Wins',
+        description: `You average ${avgGoalsInWins.toFixed(1)} goals in victories. Your attack is clinical when the team clicks.`,
+        impact: 'High - Maintain attacking confidence and create more chances'
+      });
+    }
+    
+    // Defensive solidity
+    const avgConcededInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + m.goalsConceded, 0) / wins.length : 0;
+    const avgConcededInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + m.goalsConceded, 0) / losses.length : 0;
+    
+    if (wins.length > 0 && losses.length > 0 && avgConcededInLosses > avgConcededInWins + 1) {
+      insights.push({
+        title: 'Defense Wins Matches',
+        description: `You concede ${(avgConcededInLosses - avgConcededInWins).toFixed(1)} more goals per game in losses vs wins. Defensive stability is crucial.`,
+        impact: 'High - Focus on defensive structure and organization'
+      });
+    }
+    
+    // Pass accuracy in different results
+    const avgPassInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / wins.length : 0;
+    const avgPassInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + (m.passSuccess || 0), 0) / losses.length : 0;
+    
+    if (wins.length > 0 && losses.length > 0 && avgPassInWins > avgPassInLosses + 10) {
+      insights.push({
+        title: 'Possession Control Matters',
+        description: `Pass success rate is ${(avgPassInWins - avgPassInLosses).toFixed(1)}% higher in wins. Better ball retention leads to better results.`,
+        impact: 'Medium - Focus on technical skills and ball control'
+      });
+    }
+    
+    // Tackle success patterns
+    const avgTackleInWins = wins.length > 0 ? wins.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / wins.length : 0;
+    const avgTackleInLosses = losses.length > 0 ? losses.reduce((sum, m) => sum + (m.tackleSuccess || 0), 0) / losses.length : 0;
+    
+    if (wins.length > 0 && losses.length > 0 && avgTackleInWins > avgTackleInLosses + 15) {
+      insights.push({
+        title: 'Defensive Pressing Advantage',
+        description: `Tackle success rate is ${(avgTackleInWins - avgTackleInLosses).toFixed(1)}% higher in wins. Winning the ball back quickly disrupts opponents.`,
+        impact: 'Medium - Implement more organized pressing triggers'
+      });
     }
     
     // Recent form analysis
     const recent5 = data.slice(-5);
     const recent5Wins = recent5.filter(m => m.result === 'W').length;
+    const recent5Goals = recent5.reduce((sum, m) => sum + m.goalsScored, 0);
+    const recent5Conceded = recent5.reduce((sum, m) => sum + m.goalsConceded, 0);
     
     if (recent5Wins >= 4) {
       insights.push({
-        title: 'Excellent Recent Form',
-        description: `${recent5Wins} wins in last 5 matches shows strong momentum. Team chemistry and tactics are clicking well.`,
-        impact: 'High - Confidence and momentum building'
+        title: 'Excellent Momentum Building',
+        description: `${recent5Wins} wins in last 5 matches with ${recent5Goals} goals scored. Team confidence and tactical understanding is peaking.`,
+        impact: 'High - Maintain current approach and squad selection'
       });
     } else if (recent5Wins <= 1) {
       insights.push({
-        title: 'Form Needs Attention',
-        description: `Only ${recent5Wins} wins in last 5 matches. Consider tactical adjustments or squad rotation.`,
-        impact: 'High - Immediate focus required'
+        title: 'Form Dip Requires Response',
+        description: `Only ${recent5Wins} wins in last 5 matches. Consider tactical tweaks, formation changes, or squad rotation.`,
+        impact: 'High - Immediate tactical review needed'
       });
     }
     
-    // Consistency analysis
-    const shotValues = data.map(d => d.shotSuccess);
-    const shotConsistency = calculateConsistency(shotValues);
+    // Clean sheet analysis
+    const cleanSheets = data.filter(m => m.goalsConceded === 0).length;
+    const cleanSheetRate = (cleanSheets / data.length) * 100;
     
-    if (shotConsistency < 60) {
+    if (cleanSheetRate >= 40) {
       insights.push({
-        title: 'Inconsistent Finishing',
-        description: 'Shot success rate varies significantly between matches. Work on maintaining composure in front of goal.',
-        impact: 'Medium - Affects confidence and results'
+        title: 'Defensive Fortress',
+        description: `${cleanSheetRate.toFixed(0)}% clean sheet rate shows excellent defensive organization. Your backline is your strength.`,
+        impact: 'Medium - Build attacks from solid defensive platform'
+      });
+    } else if (cleanSheetRate < 20) {
+      insights.push({
+        title: 'Defensive Vulnerability',
+        description: `Only ${cleanSheetRate.toFixed(0)}% clean sheet rate suggests defensive issues. Focus on shape and communication.`,
+        impact: 'High - Prioritize defensive drills and positioning'
       });
     }
     
-    return insights.length > 0 ? insights : [{
-      title: 'More Data Needed',
-      description: 'Play more matches to unlock deeper tactical insights and patterns.',
-      impact: 'Keep building your match history for better analysis'
+    // High-scoring game analysis  
+    const highScoringGames = data.filter(m => (m.goalsScored + m.goalsConceded) >= 4).length;
+    const highScoringRate = (highScoringGames / data.length) * 100;
+    
+    if (highScoringRate >= 30) {
+      insights.push({
+        title: 'End-to-End Football Style',
+        description: `${highScoringRate.toFixed(0)}% of games are high-scoring (4+ goals). Your team plays an open, entertaining style.`,
+        impact: 'Medium - Embrace attacking philosophy while improving defensive transitions'
+      });
+    }
+    
+    return insights.length > 0 ? insights.slice(0, 8) : [{
+      title: 'Gathering Intelligence',
+      description: 'Continue playing matches to unlock more detailed tactical insights about your team\'s patterns.',
+      impact: 'Your tactical profile will develop with more match data'
     }];
   }
 
   // Event listeners
   document.addEventListener('DOMContentLoaded', function() {
-    // Metric checkboxes
+    // Metric checkboxes - Fixed click handling
     document.getElementById('metricControls').addEventListener('click', function(e) {
       const checkbox = e.target.closest('.checkbox-item');
       if (checkbox) {
+        e.preventDefault();
         checkbox.classList.toggle('active');
-        if (matchesData.length > 0) {
-          createTrendsChart(matchesData);
+        if (displayedMatchesData.length > 0) {
+          createTrendsChart(displayedMatchesData);
         }
       }
     });
     
-    // Smoothing selector
-    document.getElementById('smoothingSelect').addEventListener('change', function() {
-      if (matchesData.length > 0) {
-        createTrendsChart(matchesData);
+    // Match count input
+    document.getElementById('matchCountInput').addEventListener('input', function() {
+      if (allMatchesData.length > 0) {
+        updateDisplayedMatches();
+      }
+    });
+    
+    // Show all matches button
+    document.getElementById('showAllMatches').addEventListener('click', function() {
+      document.getElementById('matchCountInput').value = allMatchesData.length;
+      if (allMatchesData.length > 0) {
+        updateDisplayedMatches();
       }
     });
     
@@ -672,18 +851,19 @@
       const response = await getJSON('api/matches/all.json');
       const matches = response.matches || [];
       
+      if (matches.length === 0) {
+        document.querySelectorAll('.loading').forEach(el => {
+          el.textContent = 'No match data available. Play some matches to see trends!';
+        });
+        return;
+      }
+      
       // Sort chronologically (oldest first for trends)
       const sortedMatches = matches.sort((a, b) => a.match_timestamp - b.match_timestamp);
-      matchesData = processMatchData(sortedMatches);
+      allMatchesData = processMatchData(sortedMatches);
       
-      if (matchesData.length > 0) {
-        createTrendsChart(matchesData);
-        renderFormStrip(matchesData);
-        renderKeyStats(matchesData);
-        renderCorrelationMatrix(matchesData);
-        renderConsistencyBars(matchesData);
-        renderTacticalInsights(matchesData);
-      }
+      // Initialize with default match count
+      updateDisplayedMatches();
       
     } catch (error) {
       console.error('Error loading data:', error);
