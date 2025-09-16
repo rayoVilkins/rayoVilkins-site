@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rayo Vilkins - Performance Trends</title>
+<style>
+  :root{
+    --bg:#0f0f0f; --card:#1a1a1a; --text:#ffffff; --muted:#a1a1aa; --line:#333333;
+    --rail:#facc15; --rail-dark:#f59e0b; --active-bg:#1e40af; --active-br:#3b82f6; --active-tx:#ffffff;
+    --score:#ffffff; --win:#22c55e; --loss:#ef4444; --draw:#f59e0b;
+    --navy:#ffffff; --pitch:#1a2e1a;
+    --match-bg:#1f1f1f; --match-hover:#2a2a2a; --ft-bg:#333333;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  body::after{content:"";display:block;height:120px}
+
+  /* Header / Nav */
+  header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
+  .bar{max-width:1500px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:10px 14px}
+  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9;color:var(--text)}
+  .brand a{color:inherit;text-decoration:none}
+  nav{display:flex;gap:6px}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
+  nav a[aria-current="page"]{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx)}
+  nav a:hover{color:var(--text)}
+  .spacer{flex:1}
+
+  /* Page Layout */
+  .wrap{max-width:1400px;margin:16px auto;padding:0 12px}
+  .page-header{text-align:center;margin-bottom:24px}
+  .page-title{font-size:28px;font-weight:800;color:var(--text);margin-bottom:8px}
+  .page-subtitle{color:var(--muted);font-size:14px}
+
+  /* Grid Layout */
+  .trends-grid{display:grid;grid-template-columns:1fr;gap:20px}
+  .section-card{background:var(--card);border-radius:12px;padding:20px;border:1px solid var(--line)}
+  .section-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .section-subtitle{font-size:12px;color:var(--muted);margin-bottom:12px}
+
+  /* Chart Controls */
+  .chart-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding:16px;background:var(--match-bg);border-radius:8px;border:1px solid var(--line)}
+  .control-group{display:flex;flex-direction:column;gap:6px}
+  .control-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
+  .checkbox-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;cursor:pointer;transition:all .2s}
+  .checkbox-item:hover{border-color:var(--rail)}
+  .checkbox-item.active{background:var(--rail);color:#111827;border-color:var(--rail-dark)}
+  .checkbox-item input{display:none}
+  .stat-color{width:12px;height:12px;border-radius:2px;margin-right:4px}
+
+  /* Chart Container */
+  .chart-container{position:relative;height:400px;background:var(--match-bg);border-radius:8px;padding:16px}
+  .chart-canvas{width:100% !important;height:100% !important}
+
+  /* Form Strip */
+  .form-strip{display:flex;justify-content:center;gap:4px;margin-bottom:16px}
+  .form-match{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:2px solid var(--line)}
+  .form-match.win{background:var(--win);color:#fff;border-color:var(--win)}
+  .form-match.loss{background:var(--loss);color:#fff;border-color:var(--loss)}
+  .form-match.draw{background:var(--draw);color:#111827;border-color:var(--draw)}
+
+  /* Stats Grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  .stat-item{background:var(--match-bg);padding:16px;border-radius:8px;border:1px solid var(--line);text-align:center}
+  .stat-value{font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px}
+  .stat-value.positive{color:var(--win)}
+  .stat-value.negative{color:var(--loss)}
+  .stat-value.neutral{color:var(--draw)}
+  .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stat-trend{font-size:11px;color:var(--muted);margin-top:4px}
+
+  /* Correlation Matrix */
+  .correlation-matrix{display:grid;grid-template-columns:120px repeat(4,1fr);gap:2px;background:var(--line);border-radius:8px;overflow:hidden}
+  .matrix-cell{background:var(--match-bg);padding:12px 8px;text-align:center;font-size:11px}
+  .matrix-header{background:var(--bg);font-weight:600;color:var(--text)}
+  .matrix-value{font-weight:500}
+  .correlation-high{background:var(--win);color:#fff}
+  .correlation-medium{background:var(--draw);color:#111827}
+  .correlation-low{background:var(--loss);color:#fff}
+
+  /* Tactical Insights */
+  .insights-list{display:flex;flex-direction:column;gap:12px}
+  .insight-item{background:var(--match-bg);padding:16px;border-radius:8px;border-left:4px solid var(--rail)}
+  .insight-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+  .insight-description{font-size:12px;color:var(--muted);line-height:1.4}
+  .insight-impact{font-size:11px;color:var(--rail);margin-top:4px;font-weight:500}
+
+  /* Consistency Indicators */
+  .consistency-bars{display:flex;flex-direction:column;gap:12px}
+  .consistency-bar{background:var(--match-bg);padding:12px;border-radius:8px;border:1px solid var(--line)}
+  .consistency-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .consistency-name{font-size:13px;color:var(--text);font-weight:500}
+  .consistency-score{font-size:12px;color:var(--muted)}
+  .consistency-track{height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+  .consistency-fill{height:100%;border-radius:3px;transition:width .3s}
+
+  /* Loading State */
+  .loading{display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-style:italic}
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .trends-grid{grid-template-columns:1fr}
+  }
+  @media (max-width: 768px) {
+    .wrap{padding:0 8px}
+    .chart-controls{flex-direction:column}
+    .checkbox-group{justify-content:center}
+    .stats-grid{grid-template-columns:repeat(2,1fr)}
+    .correlation-matrix{grid-template-columns:80px repeat(4,1fr);font-size:10px}
+    .matrix-cell{padding:8px 4px}
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand"><a href="matches.html">Rayo Vilkins FC</a></div>
+      <div class="spacer"></div>
+      <nav>
+        <a href="matches.html">Matches</a>
+        <a href="stats.html">Stats</a>
+        <a href="trends.html" aria-current="page">Trends</a>
+        <a href="wheel.html">Wheel</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="page-header">
+      <h1 class="page-title">Performance Trends & Insights</h1>
+      <p class="page-subtitle">Deep analysis of your team's performance patterns over time</p>
+    </div>
+
+    <div class="trends-grid">
+      <!-- Performance Trends Chart -->
+      <div class="section-card">
+        <h2 class="section-title">📈 Performance Efficiency Trends</h2>
+        <p class="section-subtitle">Track key performance metrics over your match sequence</p>
+        
+        <div class="chart-controls">
+          <div class="control-group">
+            <label class="control-label">Metrics to Display</label>
+            <div class="checkbox-group" id="metricControls">
+              <label class="checkbox-item active" data-metric="shotSuccess">
+                <input type="checkbox" checked>
+                <div class="stat-color" style="background:#ef4444"></div>
+                Shot Success %
+              </label>
+              <label class="checkbox-item active" data-metric="passSuccess">
+                <input type="checkbox" checked>
+                <div class="stat-color" style="background:#3b82f6"></div>
+                Pass Success %
+              </label>
+              <label class="checkbox-item active" data-metric="tackleSuccess">
+                <input type="checkbox" checked>
+                <div class="stat-color" style="background:#f59e0b"></div>
+                Tackle Success %
+              </label>
+              <label class="checkbox-item active" data-metric="resultPoints">
+                <input type="checkbox" checked>
+                <div class="stat-color" style="background:#22c55e"></div>
+                Result Points
+              </label>
+            </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Smoothing</label>
+            <select id="smoothingSelect" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px">
+              <option value="0">Raw Data</option>
+              <option value="3">3-Match Average</option>
+              <option value="5" selected>5-Match Average</option>
+              <option value="10">10-Match Average</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="chart-container">
+          <canvas id="trendsChart" class="chart-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Current Form & Key Stats -->
+      <div class="section-card">
+        <h2 class="section-title">🔥 Current Form & Key Metrics</h2>
+        <p class="section-subtitle">Recent performance and season averages</p>
+        
+        <div id="formStrip" class="form-strip">
+          <div class="loading">Loading recent form...</div>
+        </div>
+        
+        <div id="keyStats" class="stats-grid">
+          <div class="loading">Loading statistics...</div>
+        </div>
+      </div>
+
+      <!-- Performance Correlation Matrix -->
+      <div class="section-card">
+        <h2 class="section-title">🎯 Performance Correlation Matrix</h2>
+        <p class="section-subtitle">Which metrics correlate strongest with match wins</p>
+        
+        <div id="correlationMatrix" class="correlation-matrix">
+          <div class="loading">Calculating correlations...</div>
+        </div>
+      </div>
+
+      <!-- Consistency Tracker -->
+      <div class="section-card">
+        <h2 class="section-title">📊 Performance Consistency</h2>
+        <p class="section-subtitle">How reliable is each performance metric</p>
+        
+        <div id="consistencyBars" class="consistency-bars">
+          <div class="loading">Analyzing consistency patterns...</div>
+        </div>
+      </div>
+
+      <!-- Tactical Insights -->
+      <div class="section-card">
+        <h2 class="section-title">🧠 Tactical Insights</h2>
+        <p class="section-subtitle">Data-driven observations about your team's patterns</p>
+        
+        <div id="tacticalInsights" class="insights-list">
+          <div class="loading">Generating insights...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const OUR_CLUB_ID = '63719';
+  const API_BASE = '';
+  
+  let matchesData = [];
+  let trendsChart = null;
+  
+  // Chart colors
+  const COLORS = {
+    shotSuccess: '#ef4444',
+    passSuccess: '#3b82f6', 
+    tackleSuccess: '#f59e0b',
+    resultPoints: '#22c55e'
+  };
+
+  async function getJSON(path){
+    const res = await fetch(`${API_BASE}${path}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function calculateMovingAverage(data, window) {
+    if (window <= 1) return data;
+    
+    return data.map((_, index, array) => {
+      const start = Math.max(0, index - Math.floor(window / 2));
+      const end = Math.min(array.length, start + window);
+      const slice = array.slice(start, end);
+      return slice.reduce((sum, val) => sum + val, 0) / slice.length;
+    });
+  }
+
+  function processMatchData(matches) {
+    return matches.map((match, index) => {
+      // Calculate efficiency metrics
+      const shotSuccess = match.our_goals && match.our_shots ? 
+        (parseInt(match.our_goals) / parseInt(match.our_shots)) * 100 : 0;
+      
+      const passSuccess = match.our_passes_made && match.our_pass_attempts ?
+        (parseInt(match.our_passes_made) / parseInt(match.our_pass_attempts)) * 100 : 0;
+        
+      const tackleSuccess = match.our_tackles_made && match.our_tackle_attempts ?
+        (parseInt(match.our_tackles_made) / parseInt(match.our_tackle_attempts)) * 100 : 0;
+        
+      const resultPoints = match.result === 'W' ? 100 : (match.result === 'D' ? 50 : 0);
+      
+      return {
+        matchNumber: index + 1,
+        opponent: match.opponent_club_name,
+        date: match.match_date,
+        result: match.result,
+        shotSuccess,
+        passSuccess, 
+        tackleSuccess,
+        resultPoints,
+        ourGoals: parseInt(match.our_goals) || 0,
+        oppGoals: parseInt(match.opponent_goals) || 0
+      };
+    });
+  }
+
+  function createTrendsChart(data) {
+    const ctx = document.getElementById('trendsChart').getContext('2d');
+    
+    const datasets = [];
+    const smoothing = parseInt(document.getElementById('smoothingSelect').value);
+    
+    // Create datasets for each metric
+    ['shotSuccess', 'passSuccess', 'tackleSuccess', 'resultPoints'].forEach(metric => {
+      const checkbox = document.querySelector(`[data-metric="${metric}"]`);
+      if (checkbox && checkbox.classList.contains('active')) {
+        const rawData = data.map(d => d[metric]);
+        const smoothedData = calculateMovingAverage(rawData, smoothing);
+        
+        datasets.push({
+          label: metric.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
+          data: smoothedData,
+          borderColor: COLORS[metric],
+          backgroundColor: COLORS[metric] + '20',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.4,
+          pointBackgroundColor: COLORS[metric],
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        });
+      }
+    });
+
+    if (trendsChart) {
+      trendsChart.destroy();
+    }
+    
+    trendsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(d => `Match ${d.matchNumber}`),
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#ffffff',
+              usePointStyle: true,
+              padding: 20
+            }
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: '#1a1a1a',
+            titleColor: '#ffffff',
+            bodyColor: '#a1a1aa',
+            borderColor: '#333333',
+            borderWidth: 1,
+            callbacks: {
+              title: function(context) {
+                const match = data[context[0].dataIndex];
+                return `${match.opponent} (${match.date})`;
+              },
+              afterTitle: function(context) {
+                const match = data[context[0].dataIndex];
+                return `Result: ${match.ourGoals}-${match.oppGoals} (${match.result})`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: '#333333'
+            },
+            ticks: {
+              color: '#a1a1aa'
+            }
+          },
+          y: {
+            grid: {
+              color: '#333333'
+            },
+            ticks: {
+              color: '#a1a1aa',
+              callback: function(value) {
+                return value + '%';
+              }
+            },
+            min: 0,
+            max: 100
+          }
+        },
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
+        }
+      }
+    });
+  }
+
+  function renderFormStrip(data) {
+    const recent = data.slice(-10);
+    const container = document.getElementById('formStrip');
+    
+    container.innerHTML = recent.map(match => 
+      `<div class="form-match ${match.result.toLowerCase()}" title="${match.opponent}: ${match.ourGoals}-${match.oppGoals}">
+        ${match.result}
+      </div>`
+    ).join('');
+  }
+
+  function renderKeyStats(data) {
+    const container = document.getElementById('keyStats');
+    
+    // Calculate averages and trends
+    const avgShots = data.reduce((sum, m) => sum + m.shotSuccess, 0) / data.length;
+    const avgPasses = data.reduce((sum, m) => sum + m.passSuccess, 0) / data.length; 
+    const avgTackles = data.reduce((sum, m) => sum + m.tackleSuccess, 0) / data.length;
+    const winRate = (data.filter(m => m.result === 'W').length / data.length) * 100;
+    
+    // Recent form vs overall
+    const recent5 = data.slice(-5);
+    const recent5WinRate = (recent5.filter(m => m.result === 'W').length / recent5.length) * 100;
+    const formTrend = recent5WinRate > winRate ? 'positive' : (recent5WinRate < winRate ? 'negative' : 'neutral');
+    
+    const currentStreak = calculateCurrentStreak(data);
+    
+    container.innerHTML = `
+      <div class="stat-item">
+        <div class="stat-value">${avgShots.toFixed(1)}%</div>
+        <div class="stat-label">Shot Success</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${avgPasses.toFixed(1)}%</div>
+        <div class="stat-label">Pass Success</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${avgTackles.toFixed(1)}%</div>
+        <div class="stat-label">Tackle Success</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${winRate.toFixed(1)}%</div>
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-trend">Season Average</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value ${formTrend}">${recent5WinRate.toFixed(1)}%</div>
+        <div class="stat-label">Recent Form</div>
+        <div class="stat-trend">Last 5 matches</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value ${currentStreak.type}">${currentStreak.count}</div>
+        <div class="stat-label">Current Streak</div>
+        <div class="stat-trend">${currentStreak.text}</div>
+      </div>
+    `;
+  }
+
+  function calculateCurrentStreak(data) {
+    if (data.length === 0) return { count: 0, type: 'neutral', text: 'No matches' };
+    
+    const lastResult = data[data.length - 1].result;
+    let count = 1;
+    
+    for (let i = data.length - 2; i >= 0; i--) {
+      if (data[i].result === lastResult) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    
+    const type = lastResult === 'W' ? 'positive' : (lastResult === 'L' ? 'negative' : 'neutral');
+    const text = lastResult === 'W' ? 'Win streak' : (lastResult === 'L' ? 'Loss streak' : 'Draw streak');
+    
+    return { count, type, text };
+  }
+
+  function renderCorrelationMatrix(data) {
+    const container = document.getElementById('correlationMatrix');
+    
+    // Calculate correlations between each metric and wins
+    const metrics = ['shotSuccess', 'passSuccess', 'tackleSuccess'];
+    const correlations = {};
+    
+    metrics.forEach(metric => {
+      const wins = data.map(d => d.result === 'W' ? 1 : 0);
+      const values = data.map(d => d[metric]);
+      correlations[metric] = calculateCorrelation(wins, values);
+    });
+    
+    container.innerHTML = `
+      <div class="matrix-cell matrix-header"></div>
+      <div class="matrix-cell matrix-header">Shot %</div>
+      <div class="matrix-cell matrix-header">Pass %</div>
+      <div class="matrix-cell matrix-header">Tackle %</div>
+      <div class="matrix-cell matrix-header">Wins</div>
+      
+      <div class="matrix-cell matrix-header">Win Correlation</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.shotSuccess)}">${(correlations.shotSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.passSuccess)}">${(correlations.passSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value ${getCorrelationClass(correlations.tackleSuccess)}">${(correlations.tackleSuccess * 100).toFixed(0)}%</div>
+      <div class="matrix-cell matrix-value correlation-high">100%</div>
+    `;
+  }
+
+  function calculateCorrelation(x, y) {
+    const n = x.length;
+    if (n === 0) return 0;
+    
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+    const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+    const sumY2 = y.reduce((sum, yi) => sum + yi * yi, 0);
+    
+    const numerator = n * sumXY - sumX * sumY;
+    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+    
+    return denominator === 0 ? 0 : numerator / denominator;
+  }
+
+  function getCorrelationClass(correlation) {
+    const abs = Math.abs(correlation);
+    if (abs >= 0.7) return 'correlation-high';
+    if (abs >= 0.4) return 'correlation-medium';
+    return 'correlation-low';
+  }
+
+  function renderConsistencyBars(data) {
+    const container = document.getElementById('consistencyBars');
+    
+    const metrics = [
+      { key: 'shotSuccess', name: 'Shot Success Rate', color: '#ef4444' },
+      { key: 'passSuccess', name: 'Pass Success Rate', color: '#3b82f6' },
+      { key: 'tackleSuccess', name: 'Tackle Success Rate', color: '#f59e0b' },
+      { key: 'resultPoints', name: 'Match Results', color: '#22c55e' }
+    ];
+    
+    container.innerHTML = metrics.map(metric => {
+      const values = data.map(d => d[metric]);
+      const consistency = calculateConsistency(values);
+      
+      return `
+        <div class="consistency-bar">
+          <div class="consistency-label">
+            <span class="consistency-name">${metric.name}</span>
+            <span class="consistency-score">${consistency.toFixed(1)}% consistent</span>
+          </div>
+          <div class="consistency-track">
+            <div class="consistency-fill" style="width:${consistency}%;background:${metric.color}"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function calculateConsistency(values) {
+    if (values.length === 0) return 0;
+    
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Convert to consistency percentage (lower std dev = higher consistency)
+    const maxPossibleStdDev = 50; // Reasonable max for our percentage data
+    return Math.max(0, (1 - (stdDev / maxPossibleStdDev)) * 100);
+  }
+
+  function renderTacticalInsights(data) {
+    const container = document.getElementById('tacticalInsights');
+    const insights = generateInsights(data);
+    
+    container.innerHTML = insights.map(insight => `
+      <div class="insight-item">
+        <div class="insight-title">${insight.title}</div>
+        <div class="insight-description">${insight.description}</div>
+        <div class="insight-impact">Impact: ${insight.impact}</div>
+      </div>
+    `).join('');
+  }
+
+  function generateInsights(data) {
+    const insights = [];
+    
+    // Win rate analysis
+    const wins = data.filter(d => d.result === 'W');
+    const losses = data.filter(d => d.result === 'L');
+    
+    if (wins.length > 0 && losses.length > 0) {
+      const avgWinShots = wins.reduce((sum, m) => sum + m.shotSuccess, 0) / wins.length;
+      const avgLossShots = losses.reduce((sum, m) => sum + m.shotSuccess, 0) / losses.length;
+      
+      if (avgWinShots > avgLossShots + 5) {
+        insights.push({
+          title: 'Clinical Finishing = More Wins',
+          description: `Your shot success rate is ${(avgWinShots - avgLossShots).toFixed(1)}% higher in wins vs losses. Focus on quality over quantity in attack.`,
+          impact: 'High - Direct correlation with match results'
+        });
+      }
+      
+      const avgWinPasses = wins.reduce((sum, m) => sum + m.passSuccess, 0) / wins.length;
+      const avgLossPasses = losses.reduce((sum, m) => sum + m.passSuccess, 0) / losses.length;
+      
+      if (avgWinPasses > avgLossPasses + 10) {
+        insights.push({
+          title: 'Possession Control Key to Success',
+          description: `Pass success rate is ${(avgWinPasses - avgLossPasses).toFixed(1)}% higher in wins. Better ball retention leads to better results.`,
+          impact: 'Medium - Foundation for controlling games'
+        });
+      }
+    }
+    
+    // Recent form analysis
+    const recent5 = data.slice(-5);
+    const recent5Wins = recent5.filter(m => m.result === 'W').length;
+    
+    if (recent5Wins >= 4) {
+      insights.push({
+        title: 'Excellent Recent Form',
+        description: `${recent5Wins} wins in last 5 matches shows strong momentum. Team chemistry and tactics are clicking well.`,
+        impact: 'High - Confidence and momentum building'
+      });
+    } else if (recent5Wins <= 1) {
+      insights.push({
+        title: 'Form Needs Attention',
+        description: `Only ${recent5Wins} wins in last 5 matches. Consider tactical adjustments or squad rotation.`,
+        impact: 'High - Immediate focus required'
+      });
+    }
+    
+    // Consistency analysis
+    const shotValues = data.map(d => d.shotSuccess);
+    const shotConsistency = calculateConsistency(shotValues);
+    
+    if (shotConsistency < 60) {
+      insights.push({
+        title: 'Inconsistent Finishing',
+        description: 'Shot success rate varies significantly between matches. Work on maintaining composure in front of goal.',
+        impact: 'Medium - Affects confidence and results'
+      });
+    }
+    
+    return insights.length > 0 ? insights : [{
+      title: 'More Data Needed',
+      description: 'Play more matches to unlock deeper tactical insights and patterns.',
+      impact: 'Keep building your match history for better analysis'
+    }];
+  }
+
+  // Event listeners
+  document.addEventListener('DOMContentLoaded', function() {
+    // Metric checkboxes
+    document.getElementById('metricControls').addEventListener('click', function(e) {
+      const checkbox = e.target.closest('.checkbox-item');
+      if (checkbox) {
+        checkbox.classList.toggle('active');
+        if (matchesData.length > 0) {
+          createTrendsChart(matchesData);
+        }
+      }
+    });
+    
+    // Smoothing selector
+    document.getElementById('smoothingSelect').addEventListener('change', function() {
+      if (matchesData.length > 0) {
+        createTrendsChart(matchesData);
+      }
+    });
+    
+    loadData();
+  });
+
+  async function loadData() {
+    try {
+      const response = await getJSON('api/matches/all.json');
+      const matches = response.matches || [];
+      
+      // Sort chronologically (oldest first for trends)
+      const sortedMatches = matches.sort((a, b) => a.match_timestamp - b.match_timestamp);
+      matchesData = processMatchData(sortedMatches);
+      
+      if (matchesData.length > 0) {
+        createTrendsChart(matchesData);
+        renderFormStrip(matchesData);
+        renderKeyStats(matchesData);
+        renderCorrelationMatrix(matchesData);
+        renderConsistencyBars(matchesData);
+        renderTacticalInsights(matchesData);
+      }
+      
+    } catch (error) {
+      console.error('Error loading data:', error);
+      document.querySelectorAll('.loading').forEach(el => {
+        el.textContent = 'Failed to load data. Please refresh the page.';
+      });
+    }
+  }
+})();
+</script>
+</body>
+</html>
