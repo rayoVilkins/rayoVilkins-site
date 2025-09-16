@@ -108,6 +108,41 @@ jobs:
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in c.fetchall()]
 
+          def calculate_head_to_head(conn, our_club_id, opponent_club_id, current_match_id):
+            """Calculate head-to-head statistics between two clubs"""
+            
+            # Get all historical matches between these two clubs (excluding current match)
+            h2h_matches = q(conn, """
+              SELECT 
+                m.match_id,
+                m.match_timestamp,
+                mc1.goals as club1_goals,
+                mc2.goals as club2_goals,
+                mc1.result as club1_result,
+                mc1.match_type
+              FROM matches m
+              JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = ?
+              JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id = ?
+              WHERE m.match_id != ?
+              ORDER BY m.match_timestamp DESC
+            """, (our_club_id, opponent_club_id, current_match_id))
+            
+            # Calculate summary statistics
+            total_played = len(h2h_matches)
+            club1_wins = sum(1 for m in h2h_matches if m['club1_result'] in [1, 16385])
+            draws = sum(1 for m in h2h_matches if m['club1_result'] == 4)
+            club2_wins = sum(1 for m in h2h_matches if m['club1_result'] in [2, 10])
+            
+            return {
+              'summary': {
+                'played': total_played,
+                'club1_wins': club1_wins,
+                'draws': draws,
+                'club2_wins': club2_wins
+              },
+              'matches': h2h_matches[:10]  # Last 10 matches
+            }
+
           conn = sqlite3.connect(DB_PATH)
           conn.row_factory = sqlite3.Row
 
@@ -230,10 +265,11 @@ jobs:
               encoding="utf-8"
             )
 
-          # 3) Per-match detailed files
+          # 3) Per-match detailed files with head-to-head data
           for m in matches:
             mid = m["match_id"]
             clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
+            
             try:
               players = q(conn, """
                 SELECT * FROM player_match_stats_view 
@@ -246,10 +282,25 @@ jobs:
                 WHERE match_id = ?
                 ORDER BY club_id, rating DESC
               """, (mid,))
+            
             aggregates = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
+            
+            # Calculate head-to-head data
+            our_club_id = '63719'
+            opponent_club_id = m["opponent_club_id"]
+            head_to_head = calculate_head_to_head(conn, our_club_id, opponent_club_id, mid)
+            
+            # Create detailed match file with head_to_head included
             p = out / "matches" / mid / "detailed.json"
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps({"success": True, "match": m, "clubs": clubs, "players": players, "aggregates": aggregates}), encoding="utf-8")
+            p.write_text(json.dumps({
+              "success": True, 
+              "match": m, 
+              "clubs": clubs, 
+              "players": players, 
+              "aggregates": aggregates,
+              "head_to_head": head_to_head
+            }), encoding="utf-8")
 
           conn.close()
           PY
