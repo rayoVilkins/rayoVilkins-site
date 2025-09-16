@@ -3,39 +3,43 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Rayo Vilkins - Performance Trends</title>
+<title>Rayo Vilkins – Trends & Overall</title>
 <style>
   :root{
     --bg:#0f0f0f; --card:#1a1a1a; --text:#ffffff; --muted:#a1a1aa; --line:#333333;
     --active-bg:#1e40af; --active-br:#3b82f6; --active-tx:#ffffff;
     --win:#22c55e; --loss:#ef4444; --draw:#f59e0b;
     --match-bg:#1f1f1f;
+    --accent:#3b82f6; --accent2:#06b6d4;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
   body::after{content:"";display:block;height:120px}
 
-  /* Header / Nav */
+  /* Header */
   header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
   .bar{max-width:1500px;margin:0 auto;display:flex;gap:12px;align-items:center;padding:10px 14px}
-  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9;color:var(--text)}
+  .brand{font-weight:800;letter-spacing:.2px;font-size:14px;opacity:.9}
   .brand a{color:inherit;text-decoration:none}
+  nav{display:flex;gap:6px}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid transparent}
+  nav a[aria-current="page"]{background:var(--active-bg);border-color:var(--active-br);color:var(--active-tx)}
+  nav a:hover{color:var(--text)}
   .spacer{flex:1}
 
-  /* Page Layout */
+  /* Page */
   .wrap{max-width:1400px;margin:16px auto;padding:0 12px}
   .page-header{text-align:center;margin-bottom:24px}
-  .page-title{font-size:28px;font-weight:800;color:var(--text);margin-bottom:8px}
+  .page-title{font-size:28px;font-weight:800;margin-bottom:8px}
   .page-subtitle{color:var(--muted);font-size:14px}
 
-  /* Grid Layout */
-  .trends-grid{display:grid;grid-template-columns:1fr;gap:20px}
-  .section-card{background:var(--card);border-radius:12px;padding:20px;border:1px solid var(--line)}
-  .section-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  /* Sections */
+  .section-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+  .section-title{font-size:18px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center}
   .section-subtitle{font-size:12px;color:var(--muted);margin-bottom:12px}
 
-  /* Chart Controls */
-  .chart-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding:16px;background:var(--match-bg);border-radius:8px;border:1px solid var(--line)}
+  /* Controls */
+  .chart-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;padding:12px;background:var(--match-bg);border-radius:8px;border:1px solid var(--line)}
   .control-group{display:flex;flex-direction:column;gap:6px}
   .control-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
@@ -43,38 +47,42 @@
   .checkbox-item:hover{border-color:var(--active-br)}
   .checkbox-item.active{background:var(--active-bg);color:var(--active-tx);border-color:var(--active-br)}
   .stat-color{width:12px;height:12px;border-radius:2px;margin-right:4px}
-
-  /* Match Count Input */
   .match-count-input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;width:80px}
-  .match-count-controls{display:flex;gap:8px;align-items:center}
 
-  /* Chart Container */
+  /* Chart */
   .chart-container{position:relative;height:400px;background:var(--match-bg);border-radius:8px;padding:16px}
   .chart-canvas{width:100% !important;height:100% !important}
 
-  /* Form Strip */
+  /* Form strip & stats */
   .form-strip{display:flex;justify-content:center;gap:4px;margin-bottom:16px}
   .form-match{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:2px solid var(--line)}
   .form-match.win{background:var(--win);color:#fff;border-color:var(--win)}
   .form-match.loss{background:var(--loss);color:#fff;border-color:var(--loss)}
   .form-match.draw{background:var(--draw);color:#111827;border-color:var(--draw)}
-
-  /* Stats Grid */
   .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
   .stat-item{background:var(--match-bg);padding:16px;border-radius:8px;border:1px solid var(--line);text-align:center}
-  .stat-value{font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px}
-  .stat-value.positive{color:var(--win)}
-  .stat-value.negative{color:var(--loss)}
-  .stat-value.neutral{color:var(--draw)}
+  .stat-value{font-size:24px;font-weight:800;margin-bottom:4px}
+  .stat-value.positive{color:var(--win)} .stat-value.negative{color:var(--loss)} .stat-value.neutral{color:var(--draw)}
   .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .stat-trend{font-size:11px;color:var(--muted);margin-top:4px}
 
-  /* Responsive */
-  @media (max-width: 768px) {
-    .wrap{padding:0 8px}
-    .chart-controls{flex-direction:column}
-    .checkbox-group{justify-content:center}
-    .stats-grid{grid-template-columns:repeat(2,1fr)}
+  /* Overall dashboard blocks */
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .grid-12{grid-column:span 12} .grid-8{grid-column:span 8} .grid-6{grid-column:span 6} .grid-4{grid-column:span 4}
+  .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  .kpi .item{background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
+  .kpi .val{font-size:22px;font-weight:800}
+  .kpi .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;justify-content:space-between;gap:12px;background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .tag{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#111}
+  .barwrap{height:220px}
+  .small{font-size:11px;color:var(--muted)}
+  .loading{color:var(--muted);font-style:italic}
+
+  @media(max-width: 980px){
+    .kpi{grid-template-columns:repeat(3,1fr)}
+    .grid-12,.grid-8,.grid-6,.grid-4{grid-column:span 12}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -84,64 +92,127 @@
     <div class="bar">
       <div class="brand"><a href="matches.html">Rayo Vilkins FC</a></div>
       <div class="spacer"></div>
+      <nav>
+        <a href="matches.html">Matches</a>
+        <a href="stats.html">Stats</a>
+        <a href="trends.html" aria-current="page">Trends</a>
+        <a href="wheel.html">Wheel</a>
+      </nav>
     </div>
   </header>
 
   <div class="wrap">
     <div class="page-header">
-      <h1 class="page-title">Performance Trends & Insights</h1>
-      <p class="page-subtitle">Deep analysis of your team's performance patterns over time</p>
+      <h1 class="page-title">Performance Trends & Overall Season</h1>
+      <p class="page-subtitle">Match-sequence trends up top, season-wide analytics below</p>
     </div>
 
-    <div class="trends-grid">
-      <!-- Performance Trends Chart -->
-      <div class="section-card">
-        <h2 class="section-title">📈 Performance Efficiency Trends</h2>
-        <p class="section-subtitle">Track key performance metrics over your match sequence</p>
-        
-        <div class="chart-controls">
-          <div class="control-group">
-            <label class="control-label">Metrics to Display</label>
-            <div class="checkbox-group" id="metricControls">
-              <div class="checkbox-item active" data-metric="passSuccess">
-                <div class="stat-color" style="background:#8b5cf6"></div>
-                Pass Success %
-              </div>
-              <div class="checkbox-item active" data-metric="tackleSuccess">
-                <div class="stat-color" style="background:#06b6d4"></div>
-                Tackle Success %
-              </div>
-              <div class="checkbox-item active" data-metric="shotSuccess">
-                <div class="stat-color" style="background:#f97316"></div>
-                Shot Success %
-              </div>
+    <!-- ====== TRENDS SECTION ====== -->
+    <div class="section-card">
+      <h2 class="section-title">📈 Performance Efficiency Trends</h2>
+      <p class="section-subtitle">Track key performance metrics over your match sequence</p>
+
+      <div class="chart-controls">
+        <div class="control-group">
+          <label class="control-label">Metrics to Display</label>
+          <div class="checkbox-group" id="metricControls">
+            <div class="checkbox-item active" data-metric="passSuccess">
+              <div class="stat-color" style="background:#8b5cf6"></div> Pass Success %
             </div>
-          </div>
-          <div class="control-group">
-            <label class="control-label">Match Count</label>
-            <div class="match-count-controls">
-              <input type="number" id="matchCountInput" class="match-count-input" value="20" min="5" max="999">
-              <button id="showAllMatches" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Show All</button>
+            <div class="checkbox-item active" data-metric="tackleSuccess">
+              <div class="stat-color" style="background:#06b6d4"></div> Tackle Success %
+            </div>
+            <div class="checkbox-item active" data-metric="shotSuccess">
+              <div class="stat-color" style="background:#f97316"></div> Shot Success %
             </div>
           </div>
         </div>
-        
-        <div class="chart-container">
-          <canvas id="trendsChart" class="chart-canvas"></canvas>
+        <div class="control-group">
+          <label class="control-label">Match Count</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="matchCountInput" class="match-count-input" value="20" min="5" max="999">
+            <button id="showAllMatches" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Show All</button>
+          </div>
         </div>
       </div>
 
-      <!-- Current Form & Key Stats -->
-      <div class="section-card">
-        <h2 class="section-title">🔥 Current Form & Key Metrics</h2>
-        <p class="section-subtitle">Recent performance and season averages</p>
-        
-        <div id="formStrip" class="form-strip">
-          <div class="loading">Loading recent form...</div>
+      <div class="chart-container"><canvas id="trendsChart" class="chart-canvas"></canvas></div>
+    </div>
+
+    <div class="section-card">
+      <h2 class="section-title">🔥 Current Form & Key Metrics</h2>
+      <p class="section-subtitle">Recent performance and season averages</p>
+      <div id="formStrip" class="form-strip"><div class="loading">Loading recent form...</div></div>
+      <div id="keyStats" class="stats-grid"><div class="loading">Loading statistics...</div></div>
+    </div>
+
+    <!-- ====== OVERALL SEASON DASHBOARD ====== -->
+    <div class="section-card">
+      <h2 class="section-title">🏁 Overall Season Dashboard</h2>
+      <p class="section-subtitle">Macro identity, efficiency, outcomes, splits, H2H, and squad impact</p>
+
+      <!-- KPIs -->
+      <div class="section-card" style="margin:0 0 16px 0">
+        <div class="kpi" id="kpi"></div>
+      </div>
+
+      <div class="grid">
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Identity</div>
+          <p class="section-subtitle">Style index and control proxies (season means)</p>
+          <div class="kpi" id="identity"></div>
         </div>
-        
-        <div id="keyStats" class="stats-grid">
-          <div class="loading">Loading statistics...</div>
+
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Efficiency Funnel</div>
+          <p class="section-subtitle">Season conversion rates + PDO</p>
+          <div class="kpi" id="efficiency"></div>
+          <div class="small" id="pdoBand"></div>
+        </div>
+
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Outcome Profile</div>
+          <p class="section-subtitle">Scoreline distribution & key rates</p>
+          <div class="barwrap"><canvas id="scorelineChart"></canvas></div>
+          <div class="kpi" id="outcome"></div>
+        </div>
+
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Consistency</div>
+          <p class="section-subtitle">Volatility (CV%) and stability</p>
+          <div class="kpi" id="consistency"></div>
+          <div class="small" id="changes"></div>
+        </div>
+
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Splits – Match Type</div>
+          <p class="section-subtitle">League vs Cup etc.</p>
+          <div class="list" id="splitType"></div>
+        </div>
+
+        <div class="section-card grid-6">
+          <div class="section-title" style="margin-bottom:4px">Splits – Opponent Archetype</div>
+          <p class="section-subtitle">How you fare vs styles</p>
+          <div class="list" id="splitArch"></div>
+        </div>
+
+        <div class="section-card grid-12">
+          <div class="section-title" style="margin-bottom:4px">Splits – Season Periods</div>
+          <p class="section-subtitle">Early / Mid / Late thirds</p>
+          <div class="list" id="splitPeriod"></div>
+        </div>
+
+        <div class="section-card grid-8">
+          <div class="section-title" style="margin-bottom:4px">Top Opponents (Aggregate)</div>
+          <p class="section-subtitle">GD/game & deltas vs season baseline</p>
+          <div class="list" id="h2h"></div>
+        </div>
+
+        <div class="section-card grid-4">
+          <div class="section-title" style="margin-bottom:4px">Squad Impact</div>
+          <p class="section-subtitle">With/Without (top deltas) & Chemistry pairs</p>
+          <div class="list" id="withWithout"></div>
+          <div class="list" id="pairs" style="margin-top:8px"></div>
         </div>
       </div>
     </div>
@@ -149,20 +220,13 @@
 
 <script>
 (function(){
-  const OUR_CLUB_ID = '63719';
   const API_BASE = '';
 
   let allMatchesData = [];
   let displayedMatchesData = [];
   let trendsChart = null;
 
-  // Chart colors
-  const COLORS = {
-    passSuccess: '#8b5cf6',
-    tackleSuccess: '#06b6d4',
-    shotSuccess: '#f97316'
-  };
-
+  const COLORS = { passSuccess:'#8b5cf6', tackleSuccess:'#06b6d4', shotSuccess:'#f97316' };
   const RESULT_COLORS = { 'W':'#22c55e', 'D':'#fbbf24', 'L':'#ef4444' };
 
   async function getJSON(path){
@@ -175,10 +239,8 @@
     return matches.map((match, index) => {
       const passSuccess = match.our_passes_made && match.our_pass_attempts ?
         (parseInt(match.our_passes_made) / parseInt(match.our_pass_attempts)) * 100 : 0;
-
       const tackleSuccess = match.our_tackles_made && match.our_tackle_attempts ?
         (parseInt(match.our_tackles_made) / parseInt(match.our_tackle_attempts)) * 100 : 0;
-
       const shotSuccess = match.our_goals && match.our_shots ?
         (parseInt(match.our_goals) / parseInt(match.our_shots)) * 100 : 0;
 
@@ -203,282 +265,290 @@
       .map(el => el.getAttribute('data-metric'));
   }
 
+  function computeYAxisRange(data, activeMetrics){
+    const values = [];
+    activeMetrics.forEach(metric => {
+      data.forEach(d => { const v = d[metric]; if (typeof v === 'number' && isFinite(v)) values.push(v); });
+    });
+    if (!values.length) return {min:0, max:100};
+    let min = Math.min(...values), max = Math.max(...values);
+    let span = Math.max(max - min, 3);
+    const pad = Math.max(2, span * 0.25);
+    min = Math.max(0, Math.floor(min - pad));
+    max = Math.min(100, Math.ceil(max + pad));
+    if (max - min < 10){ const extra = (10 - (max - min))/2; min = Math.max(0, min - extra); max = Math.min(100, max + extra); }
+    return {min, max};
+  }
+
+  function createTrendsChart(data) {
+    const ctx = document.getElementById('trendsChart').getContext('2d');
+    const active = getActiveMetrics();
+    const datasets = active.map(metric => {
+      const pts = data.map(d => RESULT_COLORS[d.result]);
+      return {
+        label: ({passSuccess:'Pass Success %',tackleSuccess:'Tackle Success %',shotSuccess:'Shot Success %'})[metric],
+        data: data.map(d => d[metric]),
+        borderColor: COLORS[metric],
+        backgroundColor: COLORS[metric] + '24',
+        borderWidth: 3, fill:false, tension:0.35,
+        pointBackgroundColor: pts, pointBorderColor: pts, pointBorderWidth:2, pointRadius:5, pointHoverRadius:8
+      };
+    });
+    if (trendsChart) trendsChart.destroy();
+    const yRange = computeYAxisRange(data, active);
+    trendsChart = new Chart(ctx, {
+      type:'line',
+      data:{ labels: data.map(d => `Match ${d.matchNumber}`), datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:'top', labels:{
+            color:'#fff', usePointStyle:true, padding:20,
+            generateLabels(chart){
+              const base = Chart.defaults.plugins.legend.labels.generateLabels.call(this, chart);
+              base.push(
+                { text:'Win',  fillStyle:'#22c55e', strokeStyle:'#22c55e', pointStyle:'circle' },
+                { text:'Draw', fillStyle:'#f59e0b', strokeStyle:'#f59e0b', pointStyle:'circle' },
+                { text:'Loss', fillStyle:'#ef4444', strokeStyle:'#ef4444', pointStyle:'circle' },
+              );
+              return base;
+            }
+          }},
+          tooltip:{
+            mode:'index', intersect:false, backgroundColor:'#1a1a1a', titleColor:'#fff', bodyColor:'#a1a1aa',
+            borderColor:'#333', borderWidth:1,
+            callbacks:{
+              title(ctx){ const m = data[ctx[0].dataIndex]; return `vs ${m.opponent} (${m.date})`; },
+              afterTitle(ctx){ const m = data[ctx[0].dataIndex]; return `Result: ${m.ourGoals}-${m.oppGoals} (${m.result})`; }
+            }
+          }
+        },
+        scales:{
+          x:{ grid:{color:'#333'}, ticks:{color:'#a1a1aa'} },
+          y:{ grid:{color:'#333'}, ticks:{color:'#a1a1aa', callback:v=>v.toFixed(0)+'%'},
+              min:yRange.min, max:yRange.max, beginAtZero:false }
+        },
+        interaction:{ mode:'nearest', axis:'x', intersect:false }
+      }
+    });
+  }
+
+  function renderFormStrip(data) {
+    const recent = data.slice(-10);
+    const container = document.getElementById('formStrip');
+    container.innerHTML = recent.map(match =>
+      `<div class="form-match ${match.result.toLowerCase()}" title="vs ${match.opponent}: ${match.ourGoals}-${match.oppGoals}">
+        ${match.result}
+      </div>`).join('');
+  }
+
+  function renderKeyStats(data) {
+    const el = document.getElementById('keyStats');
+    if (!data.length){ el.innerHTML = '<div class="loading">No match data available</div>'; return; }
+    const avg = k => (data.reduce((s,m)=>s+(m[k]||0),0)/data.length)||0;
+    const winRate = (data.filter(m=>m.result==='W').length/data.length)*100;
+    const avgGoalsFor = data.reduce((s,m)=>s+(m.goalsScored||0),0)/data.length;
+    const avgGoalsAgainst = data.reduce((s,m)=>s+(m.goalsConceded||0),0)/data.length;
+    const recent5 = data.slice(-5);
+    const rWin = recent5.length ? (recent5.filter(m=>m.result==='W').length/recent5.length)*100 : 0;
+    const formTrend = rWin>winRate ? 'positive' : (rWin<winRate ? 'negative' : 'neutral');
+    const streak = (()=>{ if(!data.length) return {count:0,type:'neutral',text:'No matches'};
+      const last=data[data.length-1].result; let c=1; for(let i=data.length-2;i>=0;i--){ if(data[i].result===last) c++; else break; }
+      const type= last==='W'?'positive':(last==='L'?'negative':'neutral');
+      const text= last==='W'?'Win streak':(last==='L'?'Loss streak':'Draw streak'); return {count:c,type,text};
+    })();
+    el.innerHTML = `
+      <div class="stat-item"><div class="stat-value">${avg('passSuccess').toFixed(1)}%</div><div class="stat-label">Pass Success</div></div>
+      <div class="stat-item"><div class="stat-value">${avg('tackleSuccess').toFixed(1)}%</div><div class="stat-label">Tackle Success</div></div>
+      <div class="stat-item"><div class="stat-value">${avg('shotSuccess').toFixed(1)}%</div><div class="stat-label">Shot Success</div></div>
+      <div class="stat-item"><div class="stat-value">${avgGoalsFor.toFixed(1)}</div><div class="stat-label">Goals Per Game</div></div>
+      <div class="stat-item"><div class="stat-value">${avgGoalsAgainst.toFixed(1)}</div><div class="stat-label">Goals Against</div></div>
+      <div class="stat-item"><div class="stat-value">${winRate.toFixed(1)}%</div><div class="stat-label">Win Rate</div><div class="stat-trend">Overall</div></div>
+      <div class="stat-item"><div class="stat-value ${formTrend}">${rWin.toFixed(1)}%</div><div class="stat-label">Recent Form</div><div class="stat-trend">Last ${recent5.length} matches</div></div>
+      <div class="stat-item"><div class="stat-value ${streak.type}">${streak.count}</div><div class="stat-label">Current Streak</div><div class="stat-trend">${streak.text}</div></div>
+    `;
+  }
+
   function updateDisplayedMatches() {
     const matchCount = parseInt(document.getElementById('matchCountInput').value);
-    const totalMatches = allMatchesData.length;
-
-    displayedMatchesData = matchCount >= totalMatches
-      ? [...allMatchesData]
-      : allMatchesData.slice(-matchCount);
-
-    if (displayedMatchesData.length > 0) {
+    const total = allMatchesData.length;
+    displayedMatchesData = matchCount >= total ? [...allMatchesData] : allMatchesData.slice(-matchCount);
+    if (displayedMatchesData.length){
       createTrendsChart(displayedMatchesData);
       renderFormStrip(displayedMatchesData);
       renderKeyStats(displayedMatchesData);
     }
   }
 
-  // ---- Amplified (auto-zoomed) Y-axis for more pronounced changes ----
-  function computeYAxisRange(data, activeMetrics){
-    const values = [];
-    activeMetrics.forEach(metric => {
-      data.forEach(d => {
-        const v = d[metric];
-        if (typeof v === 'number' && isFinite(v)) values.push(v);
-      });
-    });
-    if (values.length === 0) return {min:0, max:100};
+  // ===== OVERALL SECTION RENDERERS =====
+  const pct = v => (v ?? 0).toFixed(1) + '%';
+  const p2  = v => (v ?? 0).toFixed(2);
+  const p1  = v => (v ?? 0).toFixed(1);
+  const pos = v => (v>=0 ? '+'+p2(v) : p2(v));
 
-    let min = Math.min(...values);
-    let max = Math.max(...values);
-
-    // Ensure there is a visible span
-    let span = Math.max(max - min, 3); // at least 3%
-    const pad = Math.max(2, span * 0.25); // 25% padding (>=2%)
-
-    min = Math.max(0, Math.floor(min - pad));
-    max = Math.min(100, Math.ceil(max + pad));
-
-    // If still too tight, widen a touch
-    if (max - min < 10){
-      const extra = (10 - (max - min)) / 2;
-      min = Math.max(0, min - extra);
-      max = Math.min(100, max + extra);
-    }
-    return {min, max};
-  }
-
-  function createTrendsChart(data) {
-    const ctx = document.getElementById('trendsChart').getContext('2d');
-
-    const activeMetrics = getActiveMetrics();
-    const datasets = [];
-
-    activeMetrics.forEach(metric => {
-      const pointColors = data.map(d => RESULT_COLORS[d.result]);
-      const pointBorderColors = pointColors;
-
-      datasets.push({
-        label: getMetricLabel(metric),
-        data: data.map(d => d[metric]),
-        borderColor: COLORS[metric],
-        backgroundColor: COLORS[metric] + '24',
-        borderWidth: 3,                 // thicker line for readability
-        fill: false,
-        tension: 0.35,
-        pointBackgroundColor: pointColors,
-        pointBorderColor: pointBorderColors,
-        pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 8
-      });
-    });
-
-    if (trendsChart) trendsChart.destroy();
-
-    const yRange = computeYAxisRange(data, activeMetrics);
-
-    trendsChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map(d => `Match ${d.matchNumber}`),
-        datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: {
-              color: '#ffffff',
-              usePointStyle: true,
-              padding: 20,
-              generateLabels(chart){
-                const base = Chart.defaults.plugins.legend.labels.generateLabels.call(this, chart);
-                base.push(
-                  { text: 'Win',  fillStyle: '#22c55e', strokeStyle: '#22c55e', pointStyle: 'circle' },
-                  { text: 'Draw', fillStyle: '#f59e0b', strokeStyle: '#f59e0b', pointStyle: 'circle' },
-                  { text: 'Loss', fillStyle: '#ef4444', strokeStyle: '#ef4444', pointStyle: 'circle' }
-                );
-                return base;
-              }
-            }
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: '#1a1a1a',
-            titleColor: '#ffffff',
-            bodyColor: '#a1a1aa',
-            borderColor: '#333333',
-            borderWidth: 1,
-            callbacks: {
-              title(context){
-                const match = data[context[0].dataIndex];
-                return `vs ${match.opponent} (${match.date})`;
-              },
-              afterTitle(context){
-                const match = data[context[0].dataIndex];
-                return `Result: ${match.ourGoals}-${match.oppGoals} (${match.result})`;
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { color: '#333333' },
-            ticks: { color: '#a1a1aa' }
-          },
-          y: {
-            grid: { color: '#333333' },
-            ticks: {
-              color: '#a1a1aa',
-              callback: v => v.toFixed(0) + '%'
-            },
-            min: yRange.min,
-            max: yRange.max,
-            beginAtZero: false
-          }
-        },
-        interaction: { mode: 'nearest', axis: 'x', intersect: false }
-      }
-    });
-  }
-
-  function getMetricLabel(metric) {
-    const labels = {
-      passSuccess: 'Pass Success %',
-      tackleSuccess: 'Tackle Success %',
-      shotSuccess: 'Shot Success %'
-    };
-    return labels[metric] || metric;
-  }
-
-  function renderFormStrip(data) {
-    const recent = data.slice(-10);
-    const container = document.getElementById('formStrip');
-    container.innerHTML = recent.map(match => 
-      `<div class="form-match ${match.result.toLowerCase()}" title="vs ${match.opponent}: ${match.ourGoals}-${match.oppGoals}">
-        ${match.result}
-      </div>`
-    ).join('');
-  }
-
-  function renderKeyStats(data) {
-    const container = document.getElementById('keyStats');
-    if (data.length === 0) {
-      container.innerHTML = '<div class="loading">No match data available</div>';
-      return;
-    }
-
-    const avgPasses = data.reduce((s, m) => s + (m.passSuccess || 0), 0) / data.length;
-    const avgTackles = data.reduce((s, m) => s + (m.tackleSuccess || 0), 0) / data.length;
-    const avgShots = data.reduce((s, m) => s + (m.shotSuccess || 0), 0) / data.length;
-    const winRate = (data.filter(m => m.result === 'W').length / data.length) * 100;
-    const avgGoalsFor = data.reduce((s, m) => s + (m.goalsScored || 0), 0) / data.length;
-    const avgGoalsAgainst = data.reduce((s, m) => s + (m.goalsConceded || 0), 0) / data.length;
-
-    const recent5 = data.slice(-5);
-    const recent5WinRate = recent5.length ? (recent5.filter(m => m.result === 'W').length / recent5.length) * 100 : 0;
-    const formTrend = recent5WinRate > winRate ? 'positive' : (recent5WinRate < winRate ? 'negative' : 'neutral');
-
-    const currentStreak = calculateCurrentStreak(data);
-
-    container.innerHTML = `
-      <div class="stat-item">
-        <div class="stat-value">${avgPasses.toFixed(1)}%</div>
-        <div class="stat-label">Pass Success</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${avgTackles.toFixed(1)}%</div>
-        <div class="stat-label">Tackle Success</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${avgShots.toFixed(1)}%</div>
-        <div class="stat-label">Shot Success</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${avgGoalsFor.toFixed(1)}</div>
-        <div class="stat-label">Goals Per Game</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${avgGoalsAgainst.toFixed(1)}</div>
-        <div class="stat-label">Goals Against</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value">${winRate.toFixed(1)}%</div>
-        <div class="stat-label">Win Rate</div>
-        <div class="stat-trend">Overall</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value ${formTrend}">${recent5WinRate.toFixed(1)}%</div>
-        <div class="stat-label">Recent Form</div>
-        <div class="stat-trend">Last ${recent5.length} matches</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value ${currentStreak.type}">${currentStreak.count}</div>
-        <div class="stat-label">Current Streak</div>
-        <div class="stat-trend">${currentStreak.text}</div>
-      </div>
+  function renderOverall(data){
+    // KPIs
+    const k = data.season_totals || {};
+    document.getElementById('kpi').innerHTML = `
+      <div class="item"><div class="val">${k.games??0}</div><div class="lab">Games</div></div>
+      <div class="item"><div class="val">${(k.wins??0)}-${(k.draws??0)}-${(k.losses??0)}</div><div class="lab">Record</div></div>
+      <div class="item"><div class="val">${k.goal_diff??0}</div><div class="lab">Goal Diff</div></div>
+      <div class="item"><div class="val">${p2(k.ppg??0)}</div><div class="lab">PPG</div></div>
+      <div class="item"><div class="val">${k.goals_for??0}</div><div class="lab">Goals For</div></div>
+      <div class="item"><div class="val">${k.goals_against??0}</div><div class="lab">Goals Against</div></div>
     `;
+
+    // Identity
+    const id = data.identity || {};
+    document.getElementById('identity').innerHTML = `
+      <div class="item"><div class="val">${p2(id.style_index||0)}</div><div class="lab">Style Index</div></div>
+      <div class="item"><div class="val">${p1((id.possession_share_mean||0)*100)}%</div><div class="lab">Possession Share</div></div>
+      <div class="item"><div class="val">${p1((id.field_tilt_mean||0)*100)}%</div><div class="lab">Field Tilt</div></div>
+      <div class="item"><div class="val">${p1((id.possession_share_std||0)*100)}%</div><div class="lab">Possession Spread</div></div>
+      <div class="item"><div class="val">${p1((id.field_tilt_std||0)*100)}%</div><div class="lab">Tilt Spread</div></div>
+      <div class="item"><div class="val"> </div><div class="lab"> </div></div>
+    `;
+
+    // Efficiency
+    const ef = data.efficiency || {};
+    document.getElementById('efficiency').innerHTML = `
+      <div class="item"><div class="val">${pct(ef.pass_pct||0)}</div><div class="lab">Pass %</div></div>
+      <div class="item"><div class="val">${pct(ef.tackle_pct||0)}</div><div class="lab">Tackle %</div></div>
+      <div class="item"><div class="val">${pct(ef.shot_pct||0)}</div><div class="lab">Shot %</div></div>
+      <div class="item"><div class="val">${pct(ef.save_pct||0)}</div><div class="lab">Save %</div></div>
+      <div class="item"><div class="val">${p1(ef.pdo_mean||0)}</div><div class="lab">PDO (Mean)</div></div>
+      <div class="item"><div class="val">${p1(ef.pdo_p10||0)}–${p1(ef.pdo_p90||0)}</div><div class="lab">PDO Band</div></div>
+    `;
+    document.getElementById('pdoBand').textContent = 'PDO ≈ Finishing% + Save%. Bands show typical variance (P10–P90).';
+
+    // Outcome profile
+    const op = data.outcome_profile || {};
+    const dist = Object.assign({win_by_2plus:0,win_by_1:0,draw:0,loss_by_1:0,loss_by_2plus:0}, op.scoreline_dist||{});
+    const ctx = document.getElementById('scorelineChart').getContext('2d');
+    new Chart(ctx,{
+      type:'bar',
+      data:{ labels:['Win 2+','Win 1','Draw','Loss 1','Loss 2+'],
+        datasets:[{ label:'% of Matches', data:[dist.win_by_2plus,dist.win_by_1,dist.draw,dist.loss_by_1,dist.loss_by_2plus] }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ beginAtZero:true, ticks:{callback:v=>v+'%'}, grid:{color:'#333'} }, x:{ grid:{color:'#333'} } },
+        plugins:{ legend:{ display:false } }
+    }});
+    document.getElementById('outcome').innerHTML = `
+      <div class="item"><div class="val">${pct(op.clean_sheet_rate||0)}</div><div class="lab">Clean Sheet Rate</div></div>
+      <div class="item"><div class="val">${pct(op.two_plus_goals_rate||0)}</div><div class="lab">2+ Goals Rate</div></div>
+      <div class="item"><div class="val">${pct(op.one_goal_edge||0)}</div><div class="lab">1-Goal Win Rate</div></div>
+    `;
+
+    // Consistency
+    const cs = data.consistency || {};
+    document.getElementById('consistency').innerHTML = `
+      <div class="item"><div class="val">${p1(cs.cv_pass_pct||0)}%</div><div class="lab">CV Pass%</div></div>
+      <div class="item"><div class="val">${p1(cs.cv_shot_pct||0)}%</div><div class="lab">CV Shot%</div></div>
+      <div class="item"><div class="val">${p1(cs.cv_tackle_pct||0)}%</div><div class="lab">CV Tackle%</div></div>
+      <div class="item"><div class="val">${p1(cs.cv_gf||0)}%</div><div class="lab">CV Goals For</div></div>
+      <div class="item"><div class="val">${p1(cs.cv_ga||0)}%</div><div class="lab">CV Goals Against</div></div>
+      <div class="item"><div class="val">${p1(cs.lineup_stability_avg||0)}%</div><div class="lab">Lineup Stability</div></div>
+    `;
+    document.getElementById('changes').textContent = `Change-point signals: ${cs.change_point_count||0}`;
+
+    // Splits – match type
+    const type = (data.splits && data.splits.by_match_type) || {};
+    document.getElementById('splitType').innerHTML = Object.keys(type).map(k=>{
+      const v = type[k]; if(!v || !v.count) return '';
+      return `<div class="row"><div><span class="tag">${k}</span></div>
+        <div>${p1(v.goal_diff_per_game||0)} GD/g</div>
+        <div>${pct(v.win_rate||0)} win</div>
+        <div>${pct(v.pass_pct||0)} pass</div>
+        <div>${pct(v.shot_pct||0)} shot</div></div>`;
+    }).join('');
+
+    // Splits – archetypes
+    const arch = (data.splits && data.splits.by_opponent_archetype) || {};
+    document.getElementById('splitArch').innerHTML = Object.keys(arch).map(k=>{
+      const v = arch[k]; if(!v || !v.count) return '';
+      return `<div class="row"><div><span class="tag">${k}</span></div>
+        <div>${p1(v.gd_per_game||0)} GD/g</div>
+        <div>${pct(v.win_rate||0)} win</div>
+        <div>${pct((v.field_tilt_mean||0)*100)} tilt</div></div>`;
+    }).join('');
+
+    // Splits – periods
+    const per = (data.splits && data.splits.by_period) || {};
+    document.getElementById('splitPeriod').innerHTML = Object.keys(per).map(k=>{
+      const v = per[k]; if(!v || !v.count) return '';
+      return `<div class="row"><div><span class="tag">${k}</span></div>
+        <div>${p1(v.goal_diff_per_game||0)} GD/g</div>
+        <div>${pct(v.win_rate||0)} win</div>
+        <div>${pct(v.pass_pct||0)} pass</div>
+        <div>${pct(v.shot_pct||0)} shot</div></div>`;
+    }).join('');
+
+    // H2H summary
+    const h2h = data.head_to_head_summary || [];
+    document.getElementById('h2h').innerHTML = h2h.map(v=>`
+      <div class="row">
+        <div><span class="tag">${v.opponent_name}</span></div>
+        <div>${v.w}-${v.d}-${(v.games - v.w - v.d)}</div>
+        <div>${p2(v.gd_per_game||0)} GD/g</div>
+        <div>ΔPass ${pos(v.pass_delta_vs_season||0)} pp</div>
+        <div>ΔShot ${pos(v.shot_delta_vs_season||0)} pp</div>
+      </div>`).join('');
+
+    // With/Without
+    const ww = ((data.squad_impact && data.squad_impact.with_without) || []).slice(0,8);
+    document.getElementById('withWithout').innerHTML = ww.map(v=>`
+      <div class="row">
+        <div><span class="tag">${v.player_name}</span></div>
+        <div>with ${v.matches_with} / without ${v.matches_without}</div>
+        <div>ΔWin ${pos(v.delta_win_pct)} pp</div>
+        <div>ΔPass ${pos(v.delta_pass_pct)} pp</div>
+        <div>ΔGF ${pos(v.delta_goals_for_per_game)} /g</div>
+      </div>`).join('');
+
+    // Pairs
+    const pairs = ((data.squad_impact && data.squad_impact.top_pairs) || []).slice(0,8);
+    document.getElementById('pairs').innerHTML = pairs.map(v=>`
+      <div class="row">
+        <div><span class="tag">${v.pair_name}</span></div>
+        <div>${v.matches_together} matches</div>
+        <div>${p2(v.goal_contrib_per_game)} contrib/g</div>
+      </div>`).join('');
   }
 
-  function calculateCurrentStreak(data) {
-    if (!data.length) return { count: 0, type: 'neutral', text: 'No matches' };
-    const lastResult = data[data.length - 1].result;
-    let count = 1;
-    for (let i = data.length - 2; i >= 0; i--) {
-      if (data[i].result === lastResult) count++; else break;
-    }
-    const type = lastResult === 'W' ? 'positive' : (lastResult === 'L' ? 'negative' : 'neutral');
-    const text = lastResult === 'W' ? 'Win streak' : (lastResult === 'L' ? 'Loss streak' : 'Draw streak');
-    return { count, type, text };
-  }
-
-  // Event listeners
-  document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('metricControls').addEventListener('click', function(e) {
-      const checkbox = e.target.closest('.checkbox-item');
-      if (checkbox) {
-        e.preventDefault();
-        checkbox.classList.toggle('active');
-        if (displayedMatchesData.length) createTrendsChart(displayedMatchesData);
-      }
+  // ===== Event listeners & boot =====
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Toggle metrics
+    document.getElementById('metricControls').addEventListener('click', e => {
+      const box = e.target.closest('.checkbox-item');
+      if (box){ e.preventDefault(); box.classList.toggle('active'); if (displayedMatchesData.length) createTrendsChart(displayedMatchesData); }
     });
-
-    document.getElementById('matchCountInput').addEventListener('input', function() {
-      if (allMatchesData.length) updateDisplayedMatches();
-    });
-
-    document.getElementById('showAllMatches').addEventListener('click', function() {
+    // Match count changes
+    document.getElementById('matchCountInput').addEventListener('input', () => { if (allMatchesData.length) updateDisplayedMatches(); });
+    document.getElementById('showAllMatches').addEventListener('click', () => {
       document.getElementById('matchCountInput').value = allMatchesData.length;
       if (allMatchesData.length) updateDisplayedMatches();
     });
 
-    loadData();
-  });
-
-  async function loadData() {
-    try {
-      const response = await getJSON('api/matches/all.json');
-      const matches = response.matches || [];
-      if (!matches.length) {
-        document.querySelectorAll('.loading').forEach(el => {
-          el.textContent = 'No match data available. Play some matches to see trends!';
-        });
-        return;
-      }
-      const sorted = matches.sort((a,b) => a.match_timestamp - b.match_timestamp);
-      allMatchesData = processMatchData(sorted);
+    // Load trends data
+    try{
+      const resp = await getJSON('api/matches/all.json');
+      const matches = (resp.matches||[]).sort((a,b)=>a.match_timestamp-b.match_timestamp);
+      allMatchesData = processMatchData(matches);
       updateDisplayedMatches();
-    } catch (err) {
+    }catch(err){
       console.error(err);
-      document.querySelectorAll('.loading').forEach(el => {
-        el.textContent = 'Failed to load data. Please refresh the page.';
-      });
+      document.querySelectorAll('.loading').forEach(el=>el.textContent='Failed to load match data.');
     }
-  }
+
+    // Load overall summary
+    try{
+      const s = await getJSON('api/season/summary.json');
+      renderOverall(s);
+    }catch(err){
+      console.error(err);
+      // If missing, leave placeholders empty
+    }
+  });
 })();
 </script>
 </body>
