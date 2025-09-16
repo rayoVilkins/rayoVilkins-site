@@ -3,18 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Rayo Vilkins – Trends & Overall</title>
+<title>Rayo Vilkins – Trends & Season Overview</title>
 <style>
   :root{
     --bg:#0f0f0f; --card:#1a1a1a; --text:#ffffff; --muted:#a1a1aa; --line:#333333;
     --active-bg:#1e40af; --active-br:#3b82f6; --active-tx:#ffffff;
     --win:#22c55e; --loss:#ef4444; --draw:#f59e0b;
     --match-bg:#1f1f1f;
-    --accent:#3b82f6; --accent2:#06b6d4;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  body::after{content:"";display:block;height:120px}
+  body::after{content:"";display:block;height:100px}
 
   /* Header */
   header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
@@ -29,17 +28,16 @@
 
   /* Page */
   .wrap{max-width:1400px;margin:16px auto;padding:0 12px}
-  .page-header{text-align:center;margin-bottom:24px}
-  .page-title{font-size:28px;font-weight:800;margin-bottom:8px}
+  .page-header{text-align:center;margin-bottom:20px}
+  .page-title{font-size:28px;font-weight:800;margin-bottom:6px}
   .page-subtitle{color:var(--muted);font-size:14px}
 
-  /* Sections */
-  .section-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
-  .section-title{font-size:18px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center}
-  .section-subtitle{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .section-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .section-title{font-size:18px;font-weight:700;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+  .section-subtitle{font-size:12px;color:var(--muted);margin-bottom:10px}
 
   /* Controls */
-  .chart-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;padding:12px;background:var(--match-bg);border-radius:8px;border:1px solid var(--line)}
+  .chart-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;padding:12px;background:var(--match-bg);border-radius:8px;border:1px solid var(--line)}
   .control-group{display:flex;flex-direction:column;gap:6px}
   .control-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
@@ -50,39 +48,45 @@
   .match-count-input{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;width:80px}
 
   /* Chart */
-  .chart-container{position:relative;height:400px;background:var(--match-bg);border-radius:8px;padding:16px}
+  .chart-container{position:relative;height:380px;background:var(--match-bg);border-radius:8px;padding:12px}
   .chart-canvas{width:100% !important;height:100% !important}
 
-  /* Form strip & stats */
-  .form-strip{display:flex;justify-content:center;gap:4px;margin-bottom:16px}
-  .form-match{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:2px solid var(--line)}
+  /* Form + key stats */
+  .form-strip{display:flex;justify-content:center;gap:4px;margin-bottom:12px}
+  .form-match{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid var(--line)}
   .form-match.win{background:var(--win);color:#fff;border-color:var(--win)}
   .form-match.loss{background:var(--loss);color:#fff;border-color:var(--loss)}
   .form-match.draw{background:var(--draw);color:#111827;border-color:var(--draw)}
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
-  .stat-item{background:var(--match-bg);padding:16px;border-radius:8px;border:1px solid var(--line);text-align:center}
-  .stat-value{font-size:24px;font-weight:800;margin-bottom:4px}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .stat-item{background:var(--match-bg);padding:12px;border-radius:8px;border:1px solid var(--line);text-align:center}
+  .stat-value{font-size:22px;font-weight:800;margin-bottom:2px}
   .stat-value.positive{color:var(--win)} .stat-value.negative{color:var(--loss)} .stat-value.neutral{color:var(--draw)}
-  .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .stat-trend{font-size:11px;color:var(--muted);margin-top:4px}
+  .stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .stat-trend{font-size:11px;color:var(--muted);margin-top:2px}
 
-  /* Overall dashboard blocks */
-  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-  .grid-12{grid-column:span 12} .grid-8{grid-column:span 8} .grid-6{grid-column:span 6} .grid-4{grid-column:span 4}
-  .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
-  .kpi .item{background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
-  .kpi .val{font-size:22px;font-weight:800}
-  .kpi .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  /* Overall – simplified */
+  .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .kpi .item{background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+  .kpi .val{font-size:20px;font-weight:800}
+  .kpi .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+
+  .flex{display:flex;gap:12px;flex-wrap:wrap}
+  .tile{flex:1 1 260px;background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .tile h4{margin:0 0 6px 0;font-size:14px}
+  .row{display:flex;justify-content:space-between;gap:8px}
+  .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#111;display:inline-block}
+
+  .stack-bar{height:16px;border-radius:8px;overflow:hidden;border:1px solid var(--line);display:flex}
+  .stack-win{background:var(--win)} .stack-draw{background:var(--draw)} .stack-loss{background:var(--loss)}
+
   .list{display:flex;flex-direction:column;gap:8px}
-  .row{display:flex;justify-content:space-between;gap:12px;background:var(--match-bg);border:1px solid var(--line);border-radius:10px;padding:10px}
-  .tag{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#111}
-  .barwrap{height:220px}
+  .simple-row{display:flex;justify-content:space-between;gap:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#151515}
   .small{font-size:11px;color:var(--muted)}
+
   .loading{color:var(--muted);font-style:italic}
 
   @media(max-width: 980px){
     .kpi{grid-template-columns:repeat(3,1fr)}
-    .grid-12,.grid-8,.grid-6,.grid-4{grid-column:span 12}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -103,32 +107,32 @@
 
   <div class="wrap">
     <div class="page-header">
-      <h1 class="page-title">Performance Trends & Overall Season</h1>
-      <p class="page-subtitle">Match-sequence trends up top, season-wide analytics below</p>
+      <h1 class="page-title">Performance Trends & Season Overview</h1>
+      <p class="page-subtitle">Match-by-match trends up top • simple season story below</p>
     </div>
 
-    <!-- ====== TRENDS SECTION ====== -->
+    <!-- ===== MATCH TRENDS ===== -->
     <div class="section-card">
       <h2 class="section-title">📈 Performance Efficiency Trends</h2>
-      <p class="section-subtitle">Track key performance metrics over your match sequence</p>
+      <p class="section-subtitle">See how your % stats moved over time</p>
 
       <div class="chart-controls">
         <div class="control-group">
-          <label class="control-label">Metrics to Display</label>
+          <label class="control-label">Show Lines</label>
           <div class="checkbox-group" id="metricControls">
             <div class="checkbox-item active" data-metric="passSuccess">
-              <div class="stat-color" style="background:#8b5cf6"></div> Pass Success %
+              <div class="stat-color" style="background:#8b5cf6"></div> Pass %
             </div>
             <div class="checkbox-item active" data-metric="tackleSuccess">
-              <div class="stat-color" style="background:#06b6d4"></div> Tackle Success %
+              <div class="stat-color" style="background:#06b6d4"></div> Tackle %
             </div>
             <div class="checkbox-item active" data-metric="shotSuccess">
-              <div class="stat-color" style="background:#f97316"></div> Shot Success %
+              <div class="stat-color" style="background:#f97316"></div> Shot %
             </div>
           </div>
         </div>
         <div class="control-group">
-          <label class="control-label">Match Count</label>
+          <label class="control-label">How many matches?</label>
           <div style="display:flex;gap:8px;align-items:center">
             <input type="number" id="matchCountInput" class="match-count-input" value="20" min="5" max="999">
             <button id="showAllMatches" style="background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px">Show All</button>
@@ -141,78 +145,63 @@
 
     <div class="section-card">
       <h2 class="section-title">🔥 Current Form & Key Metrics</h2>
-      <p class="section-subtitle">Recent performance and season averages</p>
+      <p class="section-subtitle">Last matches at a glance + simple season numbers</p>
       <div id="formStrip" class="form-strip"><div class="loading">Loading recent form...</div></div>
       <div id="keyStats" class="stats-grid"><div class="loading">Loading statistics...</div></div>
     </div>
 
-    <!-- ====== OVERALL SEASON DASHBOARD ====== -->
+    <!-- ===== SEASON OVERVIEW (SIMPLIFIED) ===== -->
     <div class="section-card">
-      <h2 class="section-title">🏁 Overall Season Dashboard</h2>
-      <p class="section-subtitle">Macro identity, efficiency, outcomes, splits, H2H, and squad impact</p>
+      <h2 class="section-title">🏁 Season Overview (Simple)</h2>
+      <p class="section-subtitle">No jargon. Just the big picture.</p>
 
-      <!-- KPIs -->
-      <div class="section-card" style="margin:0 0 16px 0">
-        <div class="kpi" id="kpi"></div>
+      <!-- Scoreboard -->
+      <div class="kpi" id="kpi"></div>
+
+      <div class="flex" style="margin-top:12px">
+        <!-- Results mix -->
+        <div class="tile">
+          <h4>Results mix</h4>
+          <div class="stack-bar" id="resultsBar" title="Share of wins, draws, losses"></div>
+          <div class="small" id="resultsText" style="margin-top:6px"></div>
+        </div>
+
+        <!-- Key outcomes (easy wins) -->
+        <div class="tile">
+          <h4>Key outcomes</h4>
+          <div class="list" id="keyOutcomes">
+            <div class="loading">Loading…</div>
+          </div>
+          <div class="small" style="margin-top:6px">Clean sheets = no goals conceded. “2+ goals” = strong attacking games. “1-goal win” = clutch edge in tight matches.</div>
+        </div>
+
+        <!-- Consistency (plain English) -->
+        <div class="tile">
+          <h4>How steady were we?</h4>
+          <div class="list" id="consistencySimple">
+            <div class="loading">Loading…</div>
+          </div>
+          <div class="small" style="margin-top:6px">“Very steady” means numbers barely swing week-to-week. “Up & down” means big swings.</div>
+        </div>
       </div>
 
-      <div class="grid">
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Identity</div>
-          <p class="section-subtitle">Style index and control proxies (season means)</p>
-          <div class="kpi" id="identity"></div>
+      <div class="flex" style="margin-top:12px">
+        <!-- With/Without -->
+        <div class="tile" style="flex:1 1 420px">
+          <h4>Players who lift the team</h4>
+          <div class="list" id="withWithout">
+            <div class="loading">Loading…</div>
+          </div>
+          <div class="small" style="margin-top:6px">Impact = team performance difference in games **with** the player vs **without**.</div>
         </div>
 
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Efficiency Funnel</div>
-          <p class="section-subtitle">Season conversion rates + PDO</p>
-          <div class="kpi" id="efficiency"></div>
-          <div class="small" id="pdoBand"></div>
-        </div>
-
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Outcome Profile</div>
-          <p class="section-subtitle">Scoreline distribution & key rates</p>
-          <div class="barwrap"><canvas id="scorelineChart"></canvas></div>
-          <div class="kpi" id="outcome"></div>
-        </div>
-
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Consistency</div>
-          <p class="section-subtitle">Volatility (CV%) and stability</p>
-          <div class="kpi" id="consistency"></div>
-          <div class="small" id="changes"></div>
-        </div>
-
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Splits – Match Type</div>
-          <p class="section-subtitle">League vs Cup etc.</p>
-          <div class="list" id="splitType"></div>
-        </div>
-
-        <div class="section-card grid-6">
-          <div class="section-title" style="margin-bottom:4px">Splits – Opponent Archetype</div>
-          <p class="section-subtitle">How you fare vs styles</p>
-          <div class="list" id="splitArch"></div>
-        </div>
-
-        <div class="section-card grid-12">
-          <div class="section-title" style="margin-bottom:4px">Splits – Season Periods</div>
-          <p class="section-subtitle">Early / Mid / Late thirds</p>
-          <div class="list" id="splitPeriod"></div>
-        </div>
-
-        <div class="section-card grid-8">
-          <div class="section-title" style="margin-bottom:4px">Top Opponents (Aggregate)</div>
-          <p class="section-subtitle">GD/game & deltas vs season baseline</p>
-          <div class="list" id="h2h"></div>
-        </div>
-
-        <div class="section-card grid-4">
-          <div class="section-title" style="margin-bottom:4px">Squad Impact</div>
-          <p class="section-subtitle">With/Without (top deltas) & Chemistry pairs</p>
-          <div class="list" id="withWithout"></div>
-          <div class="list" id="pairs" style="margin-top:8px"></div>
+        <!-- Chemistry pairs -->
+        <div class="tile" style="flex:1 1 320px">
+          <h4>Best partnerships</h4>
+          <div class="list" id="pairs">
+            <div class="loading">Loading…</div>
+          </div>
+          <div class="small" style="margin-top:6px">Goal contributions per game when both play.</div>
         </div>
       </div>
     </div>
@@ -235,6 +224,7 @@
     return res.json();
   }
 
+  /* ===== Match trends helpers ===== */
   function processMatchData(matches) {
     return matches.map((match, index) => {
       const passSuccess = match.our_passes_made && match.our_pass_attempts ?
@@ -285,8 +275,9 @@
     const active = getActiveMetrics();
     const datasets = active.map(metric => {
       const pts = data.map(d => RESULT_COLORS[d.result]);
+      const labelMap = {passSuccess:'Pass %',tackleSuccess:'Tackle %',shotSuccess:'Shot %'};
       return {
-        label: ({passSuccess:'Pass Success %',tackleSuccess:'Tackle Success %',shotSuccess:'Shot Success %'})[metric],
+        label: labelMap[metric],
         data: data.map(d => d[metric]),
         borderColor: COLORS[metric],
         backgroundColor: COLORS[metric] + '24',
@@ -303,7 +294,7 @@
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{ position:'top', labels:{
-            color:'#fff', usePointStyle:true, padding:20,
+            color:'#fff', usePointStyle:true, padding:18,
             generateLabels(chart){
               const base = Chart.defaults.plugins.legend.labels.generateLabels.call(this, chart);
               base.push(
@@ -358,13 +349,13 @@
       const text= last==='W'?'Win streak':(last==='L'?'Loss streak':'Draw streak'); return {count:c,type,text};
     })();
     el.innerHTML = `
-      <div class="stat-item"><div class="stat-value">${avg('passSuccess').toFixed(1)}%</div><div class="stat-label">Pass Success</div></div>
-      <div class="stat-item"><div class="stat-value">${avg('tackleSuccess').toFixed(1)}%</div><div class="stat-label">Tackle Success</div></div>
-      <div class="stat-item"><div class="stat-value">${avg('shotSuccess').toFixed(1)}%</div><div class="stat-label">Shot Success</div></div>
-      <div class="stat-item"><div class="stat-value">${avgGoalsFor.toFixed(1)}</div><div class="stat-label">Goals Per Game</div></div>
-      <div class="stat-item"><div class="stat-value">${avgGoalsAgainst.toFixed(1)}</div><div class="stat-label">Goals Against</div></div>
+      <div class="stat-item"><div class="stat-value">${avg('passSuccess').toFixed(1)}%</div><div class="stat-label">Pass %</div></div>
+      <div class="stat-item"><div class="stat-value">${avg('tackleSuccess').toFixed(1)}%</div><div class="stat-label">Tackle %</div></div>
+      <div class="stat-item"><div class="stat-value">${avg('shotSuccess').toFixed(1)}%</div><div class="stat-label">Shot %</div></div>
+      <div class="stat-item"><div class="stat-value">${avgGoalsFor.toFixed(1)}</div><div class="stat-label">Goals For (per game)</div></div>
+      <div class="stat-item"><div class="stat-value">${avgGoalsAgainst.toFixed(1)}</div><div class="stat-label">Goals Against (per game)</div></div>
       <div class="stat-item"><div class="stat-value">${winRate.toFixed(1)}%</div><div class="stat-label">Win Rate</div><div class="stat-trend">Overall</div></div>
-      <div class="stat-item"><div class="stat-value ${formTrend}">${rWin.toFixed(1)}%</div><div class="stat-label">Recent Form</div><div class="stat-trend">Last ${recent5.length} matches</div></div>
+      <div class="stat-item"><div class="stat-value ${formTrend}">${rWin.toFixed(1)}%</div><div class="stat-label">Recent Wins</div><div class="stat-trend">Last ${recent5.length} games</div></div>
       <div class="stat-item"><div class="stat-value ${streak.type}">${streak.count}</div><div class="stat-label">Current Streak</div><div class="stat-trend">${streak.text}</div></div>
     `;
   }
@@ -380,156 +371,102 @@
     }
   }
 
-  // ===== OVERALL SECTION RENDERERS =====
+  /* ===== Season overview (simple) ===== */
   const pct = v => (v ?? 0).toFixed(1) + '%';
   const p2  = v => (v ?? 0).toFixed(2);
   const p1  = v => (v ?? 0).toFixed(1);
-  const pos = v => (v>=0 ? '+'+p2(v) : p2(v));
+  const pos = v => (v>=0 ? '+'+p1(v) : p1(v));
 
-  function renderOverall(data){
-    // KPIs
+  function consistencyLabel(cv){
+    // cv is a % value
+    if (cv <= 10) return 'Very steady ✅';
+    if (cv <= 20) return 'Fairly steady 👍';
+    return 'Up & down ⚠️';
+  }
+
+  function renderSeasonSimple(data){
     const k = data.season_totals || {};
+    // Scoreboard
     document.getElementById('kpi').innerHTML = `
       <div class="item"><div class="val">${k.games??0}</div><div class="lab">Games</div></div>
       <div class="item"><div class="val">${(k.wins??0)}-${(k.draws??0)}-${(k.losses??0)}</div><div class="lab">Record</div></div>
       <div class="item"><div class="val">${k.goal_diff??0}</div><div class="lab">Goal Diff</div></div>
-      <div class="item"><div class="val">${p2(k.ppg??0)}</div><div class="lab">PPG</div></div>
+      <div class="item"><div class="val">${p2(k.ppg??0)}</div><div class="lab">Points / Game</div></div>
       <div class="item"><div class="val">${k.goals_for??0}</div><div class="lab">Goals For</div></div>
       <div class="item"><div class="val">${k.goals_against??0}</div><div class="lab">Goals Against</div></div>
     `;
 
-    // Identity
-    const id = data.identity || {};
-    document.getElementById('identity').innerHTML = `
-      <div class="item"><div class="val">${p2(id.style_index||0)}</div><div class="lab">Style Index</div></div>
-      <div class="item"><div class="val">${p1((id.possession_share_mean||0)*100)}%</div><div class="lab">Possession Share</div></div>
-      <div class="item"><div class="val">${p1((id.field_tilt_mean||0)*100)}%</div><div class="lab">Field Tilt</div></div>
-      <div class="item"><div class="val">${p1((id.possession_share_std||0)*100)}%</div><div class="lab">Possession Spread</div></div>
-      <div class="item"><div class="val">${p1((id.field_tilt_std||0)*100)}%</div><div class="lab">Tilt Spread</div></div>
-      <div class="item"><div class="val"> </div><div class="lab"> </div></div>
+    // Results mix bar
+    const total = (k.games||0) || 1;
+    const wins  = k.wins||0;
+    const draws = k.draws||0;
+    const losses= k.losses||0;
+    const wPct = (wins/total)*100, dPct=(draws/total)*100, lPct=(losses/total)*100;
+    document.getElementById('resultsBar').innerHTML = `
+      <div class="stack-win"  style="width:${wPct}%" title="Wins ${wPct.toFixed(0)}%"></div>
+      <div class="stack-draw" style="width:${dPct}%" title="Draws ${dPct.toFixed(0)}%"></div>
+      <div class="stack-loss" style="width:${lPct}%" title="Losses ${lPct.toFixed(0)}%"></div>
     `;
+    document.getElementById('resultsText').textContent = `Wins ${wPct.toFixed(0)}% • Draws ${dPct.toFixed(0)}% • Losses ${lPct.toFixed(0)}%`;
 
-    // Efficiency
-    const ef = data.efficiency || {};
-    document.getElementById('efficiency').innerHTML = `
-      <div class="item"><div class="val">${pct(ef.pass_pct||0)}</div><div class="lab">Pass %</div></div>
-      <div class="item"><div class="val">${pct(ef.tackle_pct||0)}</div><div class="lab">Tackle %</div></div>
-      <div class="item"><div class="val">${pct(ef.shot_pct||0)}</div><div class="lab">Shot %</div></div>
-      <div class="item"><div class="val">${pct(ef.save_pct||0)}</div><div class="lab">Save %</div></div>
-      <div class="item"><div class="val">${p1(ef.pdo_mean||0)}</div><div class="lab">PDO (Mean)</div></div>
-      <div class="item"><div class="val">${p1(ef.pdo_p10||0)}–${p1(ef.pdo_p90||0)}</div><div class="lab">PDO Band</div></div>
-    `;
-    document.getElementById('pdoBand').textContent = 'PDO ≈ Finishing% + Save%. Bands show typical variance (P10–P90).';
-
-    // Outcome profile
+    // Key outcomes (clean sheets, 2+ goals, one-goal edge)
     const op = data.outcome_profile || {};
-    const dist = Object.assign({win_by_2plus:0,win_by_1:0,draw:0,loss_by_1:0,loss_by_2plus:0}, op.scoreline_dist||{});
-    const ctx = document.getElementById('scorelineChart').getContext('2d');
-    new Chart(ctx,{
-      type:'bar',
-      data:{ labels:['Win 2+','Win 1','Draw','Loss 1','Loss 2+'],
-        datasets:[{ label:'% of Matches', data:[dist.win_by_2plus,dist.win_by_1,dist.draw,dist.loss_by_1,dist.loss_by_2plus] }]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        scales:{ y:{ beginAtZero:true, ticks:{callback:v=>v+'%'}, grid:{color:'#333'} }, x:{ grid:{color:'#333'} } },
-        plugins:{ legend:{ display:false } }
-    }});
-    document.getElementById('outcome').innerHTML = `
-      <div class="item"><div class="val">${pct(op.clean_sheet_rate||0)}</div><div class="lab">Clean Sheet Rate</div></div>
-      <div class="item"><div class="val">${pct(op.two_plus_goals_rate||0)}</div><div class="lab">2+ Goals Rate</div></div>
-      <div class="item"><div class="val">${pct(op.one_goal_edge||0)}</div><div class="lab">1-Goal Win Rate</div></div>
+    document.getElementById('keyOutcomes').innerHTML = `
+      <div class="simple-row"><span>🧱 Clean sheets</span><strong>${pct(op.clean_sheet_rate||0)}</strong></div>
+      <div class="simple-row"><span>⚡ Games scoring 2+ goals</span><strong>${pct(op.two_plus_goals_rate||0)}</strong></div>
+      <div class="simple-row"><span>🧩 Wins in 1-goal games</span><strong>${pct(op.one_goal_edge||0)}</strong></div>
     `;
 
-    // Consistency
+    // Consistency – plain English + lineup stability + change alerts
     const cs = data.consistency || {};
-    document.getElementById('consistency').innerHTML = `
-      <div class="item"><div class="val">${p1(cs.cv_pass_pct||0)}%</div><div class="lab">CV Pass%</div></div>
-      <div class="item"><div class="val">${p1(cs.cv_shot_pct||0)}%</div><div class="lab">CV Shot%</div></div>
-      <div class="item"><div class="val">${p1(cs.cv_tackle_pct||0)}%</div><div class="lab">CV Tackle%</div></div>
-      <div class="item"><div class="val">${p1(cs.cv_gf||0)}%</div><div class="lab">CV Goals For</div></div>
-      <div class="item"><div class="val">${p1(cs.cv_ga||0)}%</div><div class="lab">CV Goals Against</div></div>
-      <div class="item"><div class="val">${p1(cs.lineup_stability_avg||0)}%</div><div class="lab">Lineup Stability</div></div>
-    `;
-    document.getElementById('changes').textContent = `Change-point signals: ${cs.change_point_count||0}`;
+    const rows = [
+      ['Passing consistency', consistencyLabel(cs.cv_pass_pct||0)],
+      ['Finishing consistency', consistencyLabel(cs.cv_shot_pct||0)],
+      ['Tackling consistency', consistencyLabel(cs.cv_tackle_pct||0)],
+      ['Attack output (goals for)', consistencyLabel(cs.cv_gf||0)],
+      ['Defence (goals against)', consistencyLabel(cs.cv_ga||0)],
+      ['Lineup stability', `${p1(cs.lineup_stability_avg||0)}% same starters game-to-game`],
+      ['Big change alerts', `${cs.change_point_count||0} flagged shifts`],
+    ];
+    document.getElementById('consistencySimple').innerHTML = rows.map(([a,b]) =>
+      `<div class="simple-row"><span>${a}</span><strong>${b}</strong></div>`
+    ).join('');
 
-    // Splits – match type
-    const type = (data.splits && data.splits.by_match_type) || {};
-    document.getElementById('splitType').innerHTML = Object.keys(type).map(k=>{
-      const v = type[k]; if(!v || !v.count) return '';
-      return `<div class="row"><div><span class="tag">${k}</span></div>
-        <div>${p1(v.goal_diff_per_game||0)} GD/g</div>
-        <div>${pct(v.win_rate||0)} win</div>
-        <div>${pct(v.pass_pct||0)} pass</div>
-        <div>${pct(v.shot_pct||0)} shot</div></div>`;
-    }).join('');
+    // With/Without – top 6, rounded and simplified
+    const ww = ((data.squad_impact && data.squad_impact.with_without) || []).slice(0,6);
+    document.getElementById('withWithout').innerHTML = ww.map(v => `
+      <div class="simple-row">
+        <span>👤 ${v.player_name}</span>
+        <span class="small">with ${v.matches_with} / without ${v.matches_without}</span>
+        <strong>${v.delta_win_pct>=0?'▲':'▼'} Win ${pos(v.delta_win_pct)} • Pass ${pos(v.delta_pass_pct)} • GF ${pos(v.delta_goals_for_per_game)}/g</strong>
+      </div>
+    `).join('') || '<div class="small">Not enough data yet.</div>';
 
-    // Splits – archetypes
-    const arch = (data.splits && data.splits.by_opponent_archetype) || {};
-    document.getElementById('splitArch').innerHTML = Object.keys(arch).map(k=>{
-      const v = arch[k]; if(!v || !v.count) return '';
-      return `<div class="row"><div><span class="tag">${k}</span></div>
-        <div>${p1(v.gd_per_game||0)} GD/g</div>
-        <div>${pct(v.win_rate||0)} win</div>
-        <div>${pct((v.field_tilt_mean||0)*100)} tilt</div></div>`;
-    }).join('');
-
-    // Splits – periods
-    const per = (data.splits && data.splits.by_period) || {};
-    document.getElementById('splitPeriod').innerHTML = Object.keys(per).map(k=>{
-      const v = per[k]; if(!v || !v.count) return '';
-      return `<div class="row"><div><span class="tag">${k}</span></div>
-        <div>${p1(v.goal_diff_per_game||0)} GD/g</div>
-        <div>${pct(v.win_rate||0)} win</div>
-        <div>${pct(v.pass_pct||0)} pass</div>
-        <div>${pct(v.shot_pct||0)} shot</div></div>`;
-    }).join('');
-
-    // H2H summary
-    const h2h = data.head_to_head_summary || [];
-    document.getElementById('h2h').innerHTML = h2h.map(v=>`
-      <div class="row">
-        <div><span class="tag">${v.opponent_name}</span></div>
-        <div>${v.w}-${v.d}-${(v.games - v.w - v.d)}</div>
-        <div>${p2(v.gd_per_game||0)} GD/g</div>
-        <div>ΔPass ${pos(v.pass_delta_vs_season||0)} pp</div>
-        <div>ΔShot ${pos(v.shot_delta_vs_season||0)} pp</div>
-      </div>`).join('');
-
-    // With/Without
-    const ww = ((data.squad_impact && data.squad_impact.with_without) || []).slice(0,8);
-    document.getElementById('withWithout').innerHTML = ww.map(v=>`
-      <div class="row">
-        <div><span class="tag">${v.player_name}</span></div>
-        <div>with ${v.matches_with} / without ${v.matches_without}</div>
-        <div>ΔWin ${pos(v.delta_win_pct)} pp</div>
-        <div>ΔPass ${pos(v.delta_pass_pct)} pp</div>
-        <div>ΔGF ${pos(v.delta_goals_for_per_game)} /g</div>
-      </div>`).join('');
-
-    // Pairs
-    const pairs = ((data.squad_impact && data.squad_impact.top_pairs) || []).slice(0,8);
-    document.getElementById('pairs').innerHTML = pairs.map(v=>`
-      <div class="row">
-        <div><span class="tag">${v.pair_name}</span></div>
-        <div>${v.matches_together} matches</div>
-        <div>${p2(v.goal_contrib_per_game)} contrib/g</div>
-      </div>`).join('');
+    // Best partnerships – top 6
+    const pairs = ((data.squad_impact && data.squad_impact.top_pairs) || []).slice(0,6);
+    document.getElementById('pairs').innerHTML = pairs.map(v => `
+      <div class="simple-row">
+        <span>🤝 ${v.pair_name}</span>
+        <span class="small">${v.matches_together} games together</span>
+        <strong>${p2(v.goal_contrib_per_game)} goals/assists per game</strong>
+      </div>
+    `).join('') || '<div class="small">Not enough data yet.</div>';
   }
 
-  // ===== Event listeners & boot =====
+  /* ===== Boot ===== */
   document.addEventListener('DOMContentLoaded', async () => {
-    // Toggle metrics
+    // UI events
     document.getElementById('metricControls').addEventListener('click', e => {
       const box = e.target.closest('.checkbox-item');
       if (box){ e.preventDefault(); box.classList.toggle('active'); if (displayedMatchesData.length) createTrendsChart(displayedMatchesData); }
     });
-    // Match count changes
     document.getElementById('matchCountInput').addEventListener('input', () => { if (allMatchesData.length) updateDisplayedMatches(); });
     document.getElementById('showAllMatches').addEventListener('click', () => {
       document.getElementById('matchCountInput').value = allMatchesData.length;
       if (allMatchesData.length) updateDisplayedMatches();
     });
 
-    // Load trends data
+    // Load match trends
     try{
       const resp = await getJSON('api/matches/all.json');
       const matches = (resp.matches||[]).sort((a,b)=>a.match_timestamp-b.match_timestamp);
@@ -540,13 +477,13 @@
       document.querySelectorAll('.loading').forEach(el=>el.textContent='Failed to load match data.');
     }
 
-    // Load overall summary
+    // Load season overview
     try{
       const s = await getJSON('api/season/summary.json');
-      renderOverall(s);
+      renderSeasonSimple(s);
     }catch(err){
       console.error(err);
-      // If missing, leave placeholders empty
+      // If missing, the simple tiles just stay empty
     }
   });
 })();
