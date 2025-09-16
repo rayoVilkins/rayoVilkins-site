@@ -1166,11 +1166,12 @@ INSERT INTO fetch_history VALUES(47,'2025-09-16 05:35:21',20,0,NULL,NULL,NULL,'s
 INSERT INTO fetch_history VALUES(48,'2025-09-16 10:41:07',20,0,NULL,NULL,NULL,'success',NULL);
 INSERT INTO fetch_history VALUES(49,'2025-09-16 11:00:55',20,0,NULL,NULL,NULL,'success',NULL);
 INSERT INTO fetch_history VALUES(50,'2025-09-16 11:04:14',20,0,NULL,NULL,NULL,'success',NULL);
+INSERT INTO fetch_history VALUES(51,'2025-09-16 11:11:19',20,0,NULL,NULL,NULL,'success',NULL);
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('match_clubs',88);
 INSERT INTO sqlite_sequence VALUES('match_players',497);
 INSERT INTO sqlite_sequence VALUES('match_aggregates',88);
-INSERT INTO sqlite_sequence VALUES('fetch_history',50);
+INSERT INTO sqlite_sequence VALUES('fetch_history',51);
 INSERT INTO sqlite_sequence VALUES('match_clubs',66);
 INSERT INTO sqlite_sequence VALUES('match_players',385);
 INSERT INTO sqlite_sequence VALUES('match_aggregates',66);
