@@ -112,35 +112,46 @@ jobs:
             """Calculate head-to-head statistics between two clubs"""
             
             # Get all historical matches between these two clubs (excluding current match)
+            # Always query with our_club_id as the reference point
             h2h_matches = q(conn, """
               SELECT 
                 m.match_id,
                 m.match_timestamp,
-                mc1.goals as club1_goals,
-                mc2.goals as club2_goals,
-                mc1.result as club1_result,
-                mc1.match_type
+                mc_our.goals as our_goals,
+                mc_opp.goals as opponent_goals,
+                mc_our.result as our_result,
+                mc_our.match_type,
+                mc_opp.club_name as opponent_club_name,
+                mc_opp.team_id as opponent_team_id
               FROM matches m
-              JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = ?
-              JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id = ?
+              JOIN match_clubs mc_our ON m.match_id = mc_our.match_id AND mc_our.club_id = ?
+              JOIN match_clubs mc_opp ON m.match_id = mc_opp.match_id AND mc_opp.club_id = ?
               WHERE m.match_id != ?
               ORDER BY m.match_timestamp DESC
             """, (our_club_id, opponent_club_id, current_match_id))
             
-            # Calculate summary statistics
+            # Calculate summary statistics using our_result directly
             total_played = len(h2h_matches)
-            club1_wins = sum(1 for m in h2h_matches if m['club1_result'] in [1, 16385])
-            draws = sum(1 for m in h2h_matches if m['club1_result'] == 4)
-            club2_wins = sum(1 for m in h2h_matches if m['club1_result'] in [2, 10])
+            our_wins = sum(1 for m in h2h_matches if m['our_result'] in [1, 16385])
+            draws = sum(1 for m in h2h_matches if m['our_result'] == 4)
+            our_losses = sum(1 for m in h2h_matches if m['our_result'] in [2, 10])
+            
+            # Get opponent info from the first match (all should be same opponent)
+            opponent_name = h2h_matches[0]['opponent_club_name'] if h2h_matches else 'Unknown'
+            opponent_team_id = h2h_matches[0]['opponent_team_id'] if h2h_matches else 1
             
             return {
               'summary': {
                 'played': total_played,
-                'club1_wins': club1_wins,
+                'our_wins': our_wins,
                 'draws': draws,
-                'club2_wins': club2_wins
+                'our_losses': our_losses
               },
-              'matches': h2h_matches[:10]  # Last 10 matches
+              'matches': h2h_matches[:10],  # Last 10 matches
+              'opponent_info': {
+                'club_name': opponent_name,
+                'team_id': opponent_team_id
+              }
             }
 
           conn = sqlite3.connect(DB_PATH)
