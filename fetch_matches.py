@@ -7,17 +7,17 @@ import os
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
-YOUR_CLUB_ID = '63719'
+YOUR_CLUB_ID = '19798'
 
 # Multiple endpoints for different match types
 ENDPOINTS = [
     {
         'name': 'League Matches',
-        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=63719&matchType=leagueMatch&maxResultCount=10'
+        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=leagueMatch&maxResultCount=10'
     },
     {
         'name': 'Playoff Matches', 
-        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=63719&matchType=playoffMatch&maxResultCount=10'
+        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=playoffMatch&maxResultCount=10'
     }
 ]
 
@@ -308,3 +308,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
