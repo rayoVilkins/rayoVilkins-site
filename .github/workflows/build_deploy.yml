@@ -206,8 +206,8 @@ jobs:
                 ELSE 'Unknown'
               END as result
             FROM matches m
-            JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = '63719'
-            JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id != '63719'
+            JOIN match_clubs mc1 ON m.match_id = mc1.match_id AND mc1.club_id = '19798'
+            JOIN match_clubs mc2 ON m.match_id = mc2.match_id AND mc2.club_id != '19798'
             ORDER BY m.match_timestamp ASC
           """)
           
@@ -215,8 +215,8 @@ jobs:
           for m in matches:
             mid = m["match_id"]
             aggs = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
-            our_agg = next((a for a in aggs if a['club_id'] == '63719'), {})
-            opp_agg = next((a for a in aggs if a['club_id'] != '63719'), {})
+            our_agg = next((a for a in aggs if a['club_id'] == '19798'), {})
+            opp_agg = next((a for a in aggs if a['club_id'] != '19798'), {})
             enhanced_match = dict(m)
             enhanced_match.update({
                 'our_shots': our_agg.get('shots', 0),
@@ -294,7 +294,7 @@ jobs:
                 ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(redcards) AS FLOAT)/COUNT(*)*100 ELSE 0 END, 1) AS red_cards_rate,
                 ROUND(CASE WHEN COUNT(*)>0 THEN CAST(SUM(CASE WHEN team_result IN (1,16385) THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 ELSE 0 END, 1) AS win_rate
               FROM player_match_stats_view
-              WHERE club_id = '63719' {where_pos}
+              WHERE club_id = '19798' {where_pos}
               GROUP BY player_id, player_name{group_by_trailer}
               HAVING matches_played >= 1
             """
@@ -323,7 +323,7 @@ jobs:
                 ORDER BY club_id, rating DESC
               """, (mid,))
             aggregates = q(conn, "SELECT * FROM match_aggregates WHERE match_id = ?", (mid,))
-            our_club_id = '63719'
+            our_club_id = '19798'
             opponent_club_id = m["opponent_club_id"]
             head_to_head = calculate_head_to_head(conn, our_club_id, opponent_club_id, mid)
             p = out / "matches" / mid / "detailed.json"
@@ -378,7 +378,7 @@ jobs:
           for m in enhanced_matches:
             players = q(conn, """
               SELECT player_id FROM player_match_stats_view
-              WHERE match_id = ? AND club_id = '63719'
+              WHERE match_id = ? AND club_id = '19798'
             """, (m['match_id'],))
             roster_by_match[m['match_id']] = set(p['player_id'] for p in players)
 
@@ -518,7 +518,7 @@ jobs:
             aggs['shot_pct'] = safe_div(gf2, sh)*100
             return aggs
 
-          match_types = [r['match_type'] for r in q(conn, "SELECT DISTINCT match_type FROM match_clubs WHERE club_id='63719'")]
+          match_types = [r['match_type'] for r in q(conn, "SELECT DISTINCT match_type FROM match_clubs WHERE club_id='19798'")]
           splits_by_type = {str(t): type_metrics(t) for t in match_types}
 
           # Splits: by opponent archetype (aggregated vs-us behavior)
@@ -613,7 +613,7 @@ jobs:
             rows = q(conn, """
               SELECT player_id, player_name, goals, assists
               FROM player_match_stats_view
-              WHERE match_id = ? AND club_id = '63719'
+              WHERE match_id = ? AND club_id = '19798'
             """, (m['match_id'],))
             match_players[m['match_id']] = rows
             all_player_ids.update(r['player_id'] for r in rows)
