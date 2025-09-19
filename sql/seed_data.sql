@@ -211,11 +211,12 @@ CREATE TABLE fetch_history (
     error_message TEXT
 );
 INSERT INTO fetch_history VALUES(1,'2025-09-18 21:14:57',3,3,NULL,NULL,NULL,'success',NULL);
+INSERT INTO fetch_history VALUES(2,'2025-09-19 05:32:56',3,0,NULL,NULL,NULL,'success',NULL);
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('match_clubs',6);
 INSERT INTO sqlite_sequence VALUES('match_players',35);
 INSERT INTO sqlite_sequence VALUES('match_aggregates',6);
-INSERT INTO sqlite_sequence VALUES('fetch_history',1);
+INSERT INTO sqlite_sequence VALUES('fetch_history',2);
 CREATE INDEX idx_match_timestamp ON matches(match_timestamp DESC);
 CREATE INDEX idx_club_matches ON match_clubs(club_id, match_id);
 CREATE INDEX idx_player_matches ON match_players(player_id, match_id);
