@@ -1261,11 +1261,12 @@ INSERT INTO fetch_history VALUES(25,'2025-10-12 05:31:25',0,0,NULL,NULL,NULL,'su
 INSERT INTO fetch_history VALUES(26,'2025-10-13 05:37:58',0,0,NULL,NULL,NULL,'success',NULL);
 INSERT INTO fetch_history VALUES(27,'2025-10-14 05:12:47',0,0,NULL,NULL,NULL,'success',NULL);
 INSERT INTO fetch_history VALUES(28,'2025-10-15 05:13:19',0,0,NULL,NULL,NULL,'success',NULL);
+INSERT INTO fetch_history VALUES(29,'2025-10-16 05:13:06',0,0,NULL,NULL,NULL,'success',NULL);
 DELETE FROM sqlite_sequence;
 INSERT INTO sqlite_sequence VALUES('match_clubs',100);
 INSERT INTO sqlite_sequence VALUES('match_players',553);
 INSERT INTO sqlite_sequence VALUES('match_aggregates',100);
-INSERT INTO sqlite_sequence VALUES('fetch_history',28);
+INSERT INTO sqlite_sequence VALUES('fetch_history',29);
 CREATE INDEX idx_match_timestamp ON matches(match_timestamp DESC);
 CREATE INDEX idx_club_matches ON match_clubs(club_id, match_id);
 CREATE INDEX idx_player_matches ON match_players(player_id, match_id);
