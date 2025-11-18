@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 import time
 import os
+import random
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
@@ -13,34 +14,56 @@ YOUR_CLUB_ID = '19798'
 ENDPOINTS = [
     {
         'name': 'League Matches',
-        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=leagueMatch&maxResultCount=10'
+        'url': f'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds={YOUR_CLUB_ID}&matchType=leagueMatch&maxResultCount=10'
     },
     {
         'name': 'Playoff Matches', 
-        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=playoffMatch&maxResultCount=10'
+        'url': f'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds={YOUR_CLUB_ID}&matchType=playoffMatch&maxResultCount=10'
     }
 ]
 
 def fetch_matches_from_api(endpoint_name, url):
-    """Fetch matches from EA API with proper headers"""
+    """Fetch matches from EA API with enhanced anti-detection headers"""
     
+    # Create a session to maintain cookies
+    session = requests.Session()
+    
+    # Enhanced headers to mimic a real browser more closely
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Referer': 'https://www.ea.com/games/ea-sports-fc/fc-25/pro-clubs',
         'Origin': 'https://www.ea.com',
-        'Referer': 'https://www.ea.com/',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Connection': 'keep-alive',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'DNT': '1',
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache'
     }
     
     for attempt in range(3):
         try:
             print(f"  Fetching {endpoint_name} (attempt {attempt + 1}/3)...")
+            
+            # Add random delay to mimic human behavior (between 2-5 seconds)
+            if attempt > 0:
+                delay = random.uniform(3, 7)
+                print(f"    Waiting {delay:.1f} seconds before retry...")
+                time.sleep(delay)
+            else:
+                # Small initial delay
+                time.sleep(random.uniform(1, 2))
+            
             timeout = 30 + (attempt * 10)
             
-            response = requests.get(url, headers=headers, timeout=timeout)
+            response = session.get(url, headers=headers, timeout=timeout)
             response.raise_for_status()
             data = response.json()
             print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
@@ -48,13 +71,33 @@ def fetch_matches_from_api(endpoint_name, url):
             
         except requests.exceptions.Timeout:
             print(f"    Timeout after {timeout} seconds, retrying...")
-            time.sleep(2)
+            time.sleep(3)
             continue
             
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 403:
+                print(f"    403 Forbidden error on attempt {attempt + 1}")
+                print(f"    Response headers: {dict(response.headers)}")
+                if attempt < 2:
+                    print(f"    Retrying with longer delay...")
+                    time.sleep(5 + (attempt * 3))
+                    continue
+                else:
+                    print(f"  ✗ Failed to fetch {endpoint_name} - Access Forbidden")
+                    return None
+            else:
+                print(f"    HTTP Error on attempt {attempt + 1}: {e}")
+                if attempt < 2:
+                    time.sleep(3)
+                    continue
+                else:
+                    print(f"  ✗ Failed to fetch {endpoint_name}")
+                    return None
+                    
         except requests.exceptions.RequestException as e:
             print(f"    Error on attempt {attempt + 1}: {e}")
             if attempt < 2:
-                time.sleep(2)
+                time.sleep(3)
                 continue
             else:
                 print(f"  ✗ Failed to fetch {endpoint_name}")
@@ -245,6 +288,8 @@ def main():
     print("="*50)
     print("PRO CLUBS MATCH DATA FETCHER")
     print("="*50)
+    print(f"Club ID: {YOUR_CLUB_ID}")
+    print("="*50)
     
     conn = connect_db()
     
@@ -308,4 +353,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
