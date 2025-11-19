@@ -4,7 +4,8 @@ import sqlite3
 from datetime import datetime
 import os
 
-import zendriver as zd
+# Import the lightweight HTTP client
+import httpx
 
 # Configuration
 # Read the database path from environment variable, default to 'build/proclubs.db'
@@ -15,6 +16,7 @@ YOUR_CLUB_ID = '19798'
 ENDPOINTS = [
     {
         'name': 'League Matches',
+        # The URL remains the same
         'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=leagueMatch&maxResultCount=10'
     },
     {
@@ -23,29 +25,21 @@ ENDPOINTS = [
     }
 ]
 
-async def fetch_matches_from_api(endpoint_name, url, browser):
-    """Fetch matches from EA API using Zendriver with proper headers"""
+# Note: We now use a synchronous function since httpx can handle the network call directly.
+def fetch_matches_from_api(endpoint_name, url):
+    """Fetch matches from EA API using the httpx HTTP client."""
     
     print(f"  Fetching {endpoint_name}...")
     
     try:
-        # Create a new page
-        page = await browser.get(url)
+        # Use httpx to make a direct, quick HTTP GET request
+        response = httpx.get(url, timeout=10)
         
-        # Wait for the page to load and get the response
-        await asyncio.sleep(3)  # Give it time to load
-        
-        # Get the page content (should be JSON)
-        content = await page.content()
+        # Raise an exception for bad status codes (4xx or 5xx)
+        response.raise_for_status() 
         
         # The EA API returns JSON wrapped in an array, e.g., [{"matches": [...]}]
-        # We expect the content to be a JSON string
-        try:
-            # We assume the API returns a JSON array of club objects, each containing a 'matches' key
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            print(f"  ❌ Error: Failed to decode JSON content for {endpoint_name}. Raw content start: {content[:100]}")
-            return []
+        data = response.json()
 
         if not data or not isinstance(data, list) or 'matches' not in data[0]:
             print(f"  ⚠️ Warning: API response structure unexpected for {endpoint_name}.")
@@ -53,8 +47,14 @@ async def fetch_matches_from_api(endpoint_name, url, browser):
 
         return data[0]['matches']
 
+    except httpx.HTTPStatusError as e:
+        print(f"  ❌ Error fetching {endpoint_name} - HTTP Status Error: {e.response.status_code}")
+        return []
+    except httpx.RequestError as e:
+        print(f"  ❌ Error fetching {endpoint_name} - Network/Request Error: {e}")
+        return []
     except Exception as e:
-        print(f"  ❌ Error fetching {endpoint_name}: {e}")
+        print(f"  ❌ Error processing response for {endpoint_name}: {e}")
         return []
 
 def init_db(db_path):
@@ -94,6 +94,7 @@ def init_db(db_path):
 
 def insert_match_data(conn, match_data):
     """Inserts match data if it doesn't already exist. Returns True if new, False if existing."""
+    # (The rest of this function remains the same as it handles DB logic)
     match_id = str(match_data['matchId'])
     club_id = YOUR_CLUB_ID
     
@@ -105,6 +106,7 @@ def insert_match_data(conn, match_data):
         return False # Match already exists
 
     # Determine which club is ours and which is the opponent
+    # NOTE: Assuming 'clubs' array always has 2 entries and one matches YOUR_CLUB_ID
     if match_data['clubs'][0]['clubId'] == club_id:
         our_club_data = match_data['clubs'][0]
         opponent_club_data = match_data['clubs'][1]
@@ -138,60 +140,32 @@ def insert_match_data(conn, match_data):
         print(f"  ❌ Error inserting match {match_id}: {e}")
         return False
 
-async def main():
+def main():
     """Main function to orchestrate the match fetching process."""
     
     print("="*50)
-    print("PRO CLUBS MATCH DATA FETCHER (Zendriver)")
+    print("PRO CLUBS MATCH DATA FETCHER (httpx)")
     print("="*50)
     
     # 1. Initialize DB
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = init_db(DB_PATH)
     
-    browser = None
     all_matches_count = 0
     total_new_matches = 0
     total_existing_matches = 0
 
     try:
-        # Start Zendriver browser with CI-friendly options
-        print("\n🌐 Starting browser...")
-        # CRITICAL: Use the known executable path and aggressive CI flags
-        browser = await zd.start(
-            # Using headless=True is the older way; keeping the new way in args is better
-            headless=True, # Keeping this here for compatibility, but the args are more important
-            no_sandbox=True, # Critical flag
-            browser_executable_path="/usr/bin/google-chrome",
-            timeout=30, # Increased timeout to 30 seconds for browser startup
-            browser_args=[
-                # Recommended fixes for CI/Docker environments (Ensure these are present):
-                '--headless=new',                # Use the new, more reliable headless mode
-                '--no-sandbox',                  # Necessary in most containerized environments
-                '--disable-setuid-sandbox',      # Another critical sandbox bypass
-                '--disable-dev-shm-usage',       # Fixes resource limitations on GHA runners (CRITICAL FIX)
-                '--remote-debugging-port=9222',  # Explicitly opens a port for connection
-                '--disable-site-isolation-trials', # Added for extra robustness in CI
-
-                # Other robustness flags
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--disable-software-rasterizer',
-                '--single-process',             # Added this as another strong fix for CI stability
-            ]
-        )
-        print("✅ Browser started successfully.")
         
         # 2. Fetch from all endpoints
         for endpoint in ENDPOINTS:
             print("\n" + "-"*30)
             print(f"Fetching from {endpoint['name']}...")
             
-            matches = await fetch_matches_from_api(
+            # NOTE: Calling the synchronous fetch function directly
+            matches = fetch_matches_from_api(
                 endpoint['name'], 
-                endpoint['url'], 
-                browser
+                endpoint['url']
             )
             
             if not matches:
@@ -204,12 +178,13 @@ async def main():
             
             print(f"  📝 Processing {len(matches)} matches...")
             for match in matches:
+                # We can now print match IDs without worrying about log limits since we aren't using Zendriver's verbose output.
                 if insert_match_data(conn, match):
                     new_matches += 1
-                    # print(f"    ✅ Match {match['matchId']} added") # Suppress detailed print for brevity in GHA logs
+                    # print(f"    ✅ Match {match['matchId']} added") 
                 else:
                     existing_matches += 1
-                    # print(f"    ⏭️ Match {match['matchId']} already exists") # Suppress detailed print
+                    # print(f"    ⏭️ Match {match['matchId']} already exists") 
             
             total_new_matches += new_matches
             total_existing_matches += existing_matches
@@ -217,11 +192,9 @@ async def main():
             print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
     
     except Exception as e:
-        print(f"\nFATAL ERROR in main execution loop: {e}")
         # Log the failed fetch
-        cursor = conn.cursor()
-        # FIX: Ensure this block runs even if the browser startup fails and 'browser' is None
         try:
+            cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO fetch_history (matches_found, new_matches_added, status)
                 VALUES (?, ?, ?)
@@ -229,18 +202,14 @@ async def main():
             conn.commit()
         except Exception as db_e:
             print(f"  ❌ Error logging failure to DB: {db_e}")
+        
+        print(f"\nFATAL ERROR in main execution loop: {e}")
         # Reraise the original error to fail the workflow
         raise 
     
     finally:
-        # Clean up browser
-        if browser:
-            print("\n🧹 Closing browser...")
-            try:
-                await browser.stop()
-                print("   Browser closed.")
-            except Exception as e:
-                print(f"   ⚠️ Warning: Failed to cleanly close browser: {e}")
+        # No browser cleanup needed! This code is much cleaner.
+        pass
     
     # Final summary (only if connection was successful)
     if all_matches_count > 0:
@@ -262,14 +231,12 @@ async def main():
         print("="*50)
 
 if __name__ == '__main__':
-    # Ensure all file systems are ready before running the async main
     try:
-        asyncio.run(main())
+        # No need for asyncio.run() anymore!
+        main()
     except Exception as e:
         # Catch any unexpected top-level exceptions
         print(f"\n--- TOP LEVEL EXECUTION ERROR ---")
         print(f"An unhandled exception occurred: {e}")
-        # We don't need to re-raise here because the `main`'s error handling already did it.
-        # But we keep this for ultimate safety.
         # Reraise to ensure the GitHub Action fails
         raise
