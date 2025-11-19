@@ -245,10 +245,12 @@ async def main():
     print("\n🌐 Starting browser...")
     browser = await zd.start(
         headless=True,
-        no_sandbox=True,  # Required for GitHub Actions and other CI environments
+        no_sandbox=True,
+        # 👇 Add this line with the known path
+        browser_executable_path="/usr/bin/google-chrome", 
         browser_args=[
-            '--disable-dev-shm-usage',  # Overcome limited resource problems
-            '--disable-gpu',  # Not needed in headless
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
             '--no-first-run',
             '--no-default-browser-check',
             '--disable-software-rasterizer'
