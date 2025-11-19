@@ -113,8 +113,7 @@ def safe_get(data, key, default=None):
         value = value.get(k)
     return value if value is not None else default
 
-def insert_match_.py
-data(conn, match):
+def insert_match_data(conn, match):
     """Insert a single match and all related data using INSERT OR IGNORE"""
     match_id = safe_get(match, 'matchId')
     if not match_id:
