@@ -1,1 +1,2 @@
 zendriver>=0.15.1
+websockets<14
