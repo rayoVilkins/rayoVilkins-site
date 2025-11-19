@@ -245,7 +245,7 @@ async def main():
     print("\n🌐 Starting browser...")
     browser = await zd.start(
         headless=True,
-        no_sandbox=True,  # Required for GitHub Actions and other CI environments
+        sandbox=False,  # Required for GitHub Actions and other CI environments (running as root)
         browser_args=[
             '--disable-dev-shm-usage',  # Overcome limited resource problems
             '--disable-gpu',  # Not needed in headless
