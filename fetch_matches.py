@@ -3,6 +3,8 @@ import json
 import sqlite3
 from datetime import datetime
 import os
+import shutil
+import sys
 
 import zendriver as zd
 
@@ -243,9 +245,23 @@ async def main():
     
     # Start Zendriver browser with CI-friendly options
     print("\n🌐 Starting browser...")
+    
+    # Force Chrome path on Linux CI runners (GitHub Actions)
+    # Zendriver's auto-detection often fails to find Chrome on ubuntu-latest
+    browser_executable_path = None
+    if sys.platform.startswith("linux"):
+        # Prefer the system Chrome installed on ubuntu-latest
+        browser_executable_path = (
+            shutil.which("google-chrome")
+            or shutil.which("chrome") 
+            or "/usr/bin/google-chrome"
+        )
+        print(f"  Using Chrome at: {browser_executable_path}")
+    
     browser = await zd.start(
         headless=True,
-        sandbox=False,  # Required for GitHub Actions and other CI environments (running as root)
+        sandbox=False,  # Required for GitHub Actions (running as root)
+        browser_executable_path=browser_executable_path,
         browser_args=[
             '--disable-dev-shm-usage',  # Overcome limited resource problems
             '--disable-gpu',  # Not needed in headless
