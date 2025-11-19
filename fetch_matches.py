@@ -1,9 +1,10 @@
 import asyncio
-import zendriver as zd
 import json
 import sqlite3
 from datetime import datetime
 import os
+
+import zendriver as zd
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
@@ -13,70 +14,56 @@ YOUR_CLUB_ID = '19798'
 ENDPOINTS = [
     {
         'name': 'League Matches',
-        'url': f'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds={YOUR_CLUB_ID}&matchType=leagueMatch&maxResultCount=10'
+        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=leagueMatch&maxResultCount=10'
     },
     {
         'name': 'Playoff Matches', 
-        'url': f'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds={YOUR_CLUB_ID}&matchType=playoffMatch&maxResultCount=10'
+        'url': 'https://proclubs.ea.com/api/fc/clubs/matches?platform=common-gen5&clubIds=19798&matchType=playoffMatch&maxResultCount=10'
     }
 ]
 
 async def fetch_matches_from_api(endpoint_name, url, browser):
-    """Fetch matches from EA API using zendriver (undetectable CDP)"""
+    """Fetch matches from EA API using Zendriver with proper headers"""
     
-    for attempt in range(3):
-        try:
-            print(f"  Fetching {endpoint_name} (attempt {attempt + 1}/3)...")
-            
-            # Small delay between attempts
-            if attempt > 0:
-                delay = 3 + (attempt * 2)
-                print(f"    Waiting {delay} seconds before retry...")
-                await asyncio.sleep(delay)
+    print(f"  Fetching {endpoint_name}...")
+    
+    try:
+        # Create a new page
+        page = await browser.get(url)
+        
+        # Wait for the page to load and get the response
+        await asyncio.sleep(3)  # Give it time to load
+        
+        # Get the page content (should be JSON)
+        content = await page.get_content()
+        
+        # Parse the JSON from the page content
+        # The content might be wrapped in HTML, so we need to extract the JSON
+        if '<pre>' in content:
+            # If it's wrapped in a pre tag, extract it
+            start = content.find('<pre>') + 5
+            end = content.find('</pre>')
+            json_text = content[start:end]
+        elif content.strip().startswith('[') or content.strip().startswith('{'):
+            # If it's raw JSON
+            json_text = content
+        else:
+            # Try to find JSON in the body
+            import re
+            json_match = re.search(r'(\[.*\]|\{.*\})', content, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(1)
             else:
-                await asyncio.sleep(1)
-            
-            # Navigate to the API URL
-            page = await browser.get(url)
-            
-            # Wait a moment for content to load
-            await asyncio.sleep(2)
-            
-            # Get the page content
-            content = await page.get_content()
-            
-            # Check if we got JSON or HTML error page
-            if '<html' in content.lower() or '403' in content or 'forbidden' in content.lower():
-                print(f"    Received HTML error page instead of JSON")
-                if attempt < 2:
-                    continue
-                else:
-                    print(f"  ✗ Failed to fetch {endpoint_name} - Access Forbidden")
-                    return None
-            
-            # Try to parse as JSON
-            try:
-                data = json.loads(content)
-                print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
-                return data
-            except json.JSONDecodeError:
-                print(f"    Failed to parse response as JSON")
-                if attempt < 2:
-                    continue
-                else:
-                    print(f"  ✗ Failed to fetch {endpoint_name}")
-                    return None
-                    
-        except Exception as e:
-            print(f"    Error on attempt {attempt + 1}: {e}")
-            if attempt < 2:
-                await asyncio.sleep(3)
-                continue
-            else:
-                print(f"  ✗ Failed to fetch {endpoint_name}")
+                print(f"  ✗ Could not find JSON in response for {endpoint_name}")
                 return None
-    
-    return None
+        
+        data = json.loads(json_text)
+        print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
+        return data
+        
+    except Exception as e:
+        print(f"  ✗ Error fetching {endpoint_name}: {e}")
+        return None
 
 def connect_db():
     """Connect to SQLite database"""
@@ -100,126 +87,112 @@ def insert_match_data(conn, match):
     cursor = conn.cursor()
     
     try:
-        # 1. Insert into matches table (PRIMARY KEY prevents duplicates)
+        # 1. Insert match header
         cursor.execute("""
-            INSERT OR IGNORE INTO matches (match_id, match_timestamp, time_ago_number, time_ago_unit, raw_json)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            match_id,
-            match['timestamp'],
-            match['timeAgo'].get('number'),
-            match['timeAgo'].get('unit'),
-            json.dumps(match)
-        ))
+            INSERT INTO matches (match_id, match_timestamp)
+            VALUES (?, ?)
+        """, (match_id, match.get('timestamp', 0)))
         
-        # Check if match was actually inserted
-        if cursor.rowcount == 0:
-            return False
-        
-        # 2. Process each club in the match
-        for club_id, club_data in match['clubs'].items():
+        # 2. Insert club data for both clubs
+        for club_data in match.get('clubs', {}).values():
+            club_id = club_data.get('clubId')
+            if not club_id:
+                continue
+                
+            # Insert/update club reference
             cursor.execute("""
-                INSERT OR IGNORE INTO match_clubs (
-                    match_id, club_id, club_name, date, game_number, goals, goals_against,
-                    losses, match_type, result, score, season_id, team_id, ties, 
-                    winner_by_dnf, wins, region_id, stad_name, kit_id, crest_asset_id, custom_kit_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                match_id, club_id,
-                club_data['details']['name'],
-                club_data.get('date'),
-                club_data.get('gameNumber'),
-                int(club_data.get('goals', 0)),
-                int(club_data.get('goalsAgainst', 0)),
-                int(club_data.get('losses', 0)),
-                int(club_data.get('matchType', 0)),
-                int(club_data.get('result', 0)),
-                int(club_data.get('score', 0)),
-                club_data.get('season_id'),
-                club_data.get('TEAM'),
-                int(club_data.get('ties', 0)),
-                int(club_data.get('winnerByDnf', 0)),
-                int(club_data.get('wins', 0)),
-                club_data['details'].get('regionId'),
-                club_data['details']['customKit'].get('stadName'),
-                club_data['details']['customKit'].get('kitId'),
-                club_data['details']['customKit'].get('crestAssetId'),
-                json.dumps(club_data['details']['customKit'])
-            ))
-            
-            # Update clubs table
-            cursor.execute("""
-                INSERT OR REPLACE INTO clubs (club_id, club_name, region_id, team_id, stad_name, crest_asset_id, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                INSERT INTO clubs (club_id, club_name, region_id, team_id, crest_asset_id, last_seen)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(club_id) DO UPDATE SET
+                    club_name = excluded.club_name,
+                    region_id = excluded.region_id,
+                    team_id = excluded.team_id,
+                    crest_asset_id = excluded.crest_asset_id,
+                    last_seen = CURRENT_TIMESTAMP
             """, (
                 club_id,
-                club_data['details']['name'],
-                club_data['details'].get('regionId'),
-                club_data['details'].get('teamId'),
-                club_data['details']['customKit'].get('stadName'),
-                club_data['details']['customKit'].get('crestAssetId')
+                club_data.get('name', ''),
+                club_data.get('regionId', ''),
+                club_data.get('teamId', ''),
+                club_data.get('customKit', {}).get('crestAssetId', '')
             ))
-        
-        # 3. Process players
-        for club_id, players in match.get('players', {}).items():
-            for player_id, player_data in players.items():
+            
+            # Insert match_clubs data
+            cursor.execute("""
+                INSERT OR IGNORE INTO match_clubs 
+                (match_id, club_id, club_name, goals, goals_against, result, 
+                 match_type, winner_by_dnf, team_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                match_id, club_id,
+                club_data.get('name', ''),
+                club_data.get('goals', 0),
+                club_data.get('goalsAgainst', 0),
+                club_data.get('result', 0),
+                match.get('matchType', ''),
+                club_data.get('winnerByDnf', 0),
+                club_data.get('teamId', '')
+            ))
+            
+            # 3. Insert player data
+            for player_id, player_data in club_data.get('players', {}).items():
+                # Insert/update player reference
                 cursor.execute("""
-                    INSERT OR IGNORE INTO match_players (
-                        match_id, club_id, player_id, player_name, assists, cleansheetsany, 
-                        cleansheetsdef, cleansheetsgk, goals, goalsconceded, losses, mom,
-                        namespace, passattempts, passesmade, pos, rating, realtimegame,
-                        realtimeidle, redcards, saves, score, shots, tackleattempts,
-                        tacklesmade, wins, vproattr, vprohackreason
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    match_id, club_id, player_id,
-                    player_data.get('playername'),
-                    int(player_data.get('assists', 0)),
-                    int(player_data.get('cleansheetsany', 0)),
-                    int(player_data.get('cleansheetsdef', 0)),
-                    int(player_data.get('cleansheetsgk', 0)),
-                    int(player_data.get('goals', 0)),
-                    int(player_data.get('goalsconceded', 0)),
-                    int(player_data.get('losses', 0)),
-                    int(player_data.get('mom', 0)),
-                    int(player_data.get('namespace', 0)),
-                    int(player_data.get('passattempts', 0)),
-                    int(player_data.get('passesmade', 0)),
-                    player_data.get('pos'),
-                    float(player_data.get('rating', 0)),
-                    int(player_data.get('realtimegame', 0)),
-                    int(player_data.get('realtimeidle', 0)),
-                    int(player_data.get('redcards', 0)),
-                    int(player_data.get('saves', 0)),
-                    int(player_data.get('SCORE', 0)),
-                    int(player_data.get('shots', 0)),
-                    int(player_data.get('tackleattempts', 0)),
-                    int(player_data.get('tacklesmade', 0)),
-                    int(player_data.get('wins', 0)),
-                    player_data.get('vproattr'),
-                    player_data.get('vprohackreason')
-                ))
-                
-                # Update players table
-                cursor.execute("""
-                    INSERT OR REPLACE INTO players (player_id, player_name, last_position, last_club_id, last_seen)
-                    VALUES (?, ?, ?, ?, datetime('now'))
+                    INSERT INTO players (player_id, player_name, last_position, last_club_id, last_seen)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(player_id) DO UPDATE SET
+                        player_name = excluded.player_name,
+                        last_position = excluded.last_position,
+                        last_club_id = excluded.last_club_id,
+                        last_seen = CURRENT_TIMESTAMP
                 """, (
                     player_id,
-                    player_data.get('playername'),
-                    player_data.get('pos'),
+                    player_data.get('playername', ''),
+                    player_data.get('position', ''),
                     club_id
                 ))
-        
-        # 4. Process aggregates
-        for club_id, agg_data in match.get('aggregate', {}).items():
+                
+                # Insert match_players data
+                cursor.execute("""
+                    INSERT OR IGNORE INTO match_players
+                    (match_id, club_id, player_id, player_name, goals, assists,
+                     clean_sheet_def, clean_sheet_gk, goals_conceded, losses, mom,
+                     pass_attempts, passes_made, position, rating, red_cards, saves,
+                     shots, tackle_attempts, tackles_made, wins, vproattr, pro_pos)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    match_id, club_id, player_id,
+                    player_data.get('playername', ''),
+                    player_data.get('goals', 0),
+                    player_data.get('assists', 0),
+                    player_data.get('cleansheetsdef', 0),
+                    player_data.get('cleansheetsgk', 0),
+                    player_data.get('goalsconceded', 0),
+                    player_data.get('losses', 0),
+                    player_data.get('mom', 0),
+                    player_data.get('passattempts', 0),
+                    player_data.get('passesmade', 0),
+                    player_data.get('position', ''),
+                    player_data.get('rating', 0),
+                    player_data.get('redcards', 0),
+                    player_data.get('saves', 0),
+                    player_data.get('shots', 0),
+                    player_data.get('tackleattempts', 0),
+                    player_data.get('tacklesmade', 0),
+                    player_data.get('wins', 0),
+                    player_data.get('vproattr', ''),
+                    player_data.get('pos', '')
+                ))
+            
+            # 4. Insert aggregate data
+            agg_data = club_data.get('aggregate', {})
             cursor.execute("""
-                INSERT OR IGNORE INTO match_aggregates (
-                    match_id, club_id, assists, cleansheetsany, cleansheetsdef, cleansheetsgk,
-                    goals, goalsconceded, losses, mom, namespace, passattempts, passesmade,
-                    pos, rating, realtimegame, realtimeidle, redcards, saves, score, shots,
-                    tackleattempts, tacklesmade, vproattr, vprohackreason, wins
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO match_aggregates
+                (match_id, club_id, assists, cleansheetsany, cleansheetsdef, cleansheetsgk,
+                 goals, goalsconceded, losses, mom, namespace, passattempts, passesmade,
+                 pos, rating, realtimegame, realtimeidle, redcards, saves, SCORE,
+                 shots, tackleattempts, tacklesmade, vproattr, vprohackreason, wins)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 match_id, club_id,
                 agg_data.get('assists', 0),
@@ -259,21 +232,18 @@ def insert_match_data(conn, match):
 async def main():
     """Main function to fetch and store matches from multiple endpoints"""
     print("="*50)
-    print("PRO CLUBS MATCH DATA FETCHER (ZENDRIVER)")
+    print("PRO CLUBS MATCH DATA FETCHER (Zendriver)")
     print("="*50)
-    print(f"Club ID: {YOUR_CLUB_ID}")
-    print("="*50)
-    
-    # Start zendriver browser
-    print("\n🌐 Initializing undetectable browser...")
-    browser = await zd.start(headless=True)
-    print("  ✓ Browser initialized")
     
     conn = connect_db()
     
     total_new_matches = 0
     total_existing_matches = 0
     all_matches_count = 0
+    
+    # Start Zendriver browser
+    print("\n🌐 Starting browser...")
+    browser = await zd.start(headless=True)
     
     try:
         # Fetch from each endpoint
@@ -304,8 +274,8 @@ async def main():
             print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
     
     finally:
-        # Always close the browser
-        print("\n🔒 Closing browser...")
+        # Clean up browser
+        print("\n🧹 Closing browser...")
         await browser.stop()
     
     # Log the fetch
@@ -313,27 +283,19 @@ async def main():
     cursor.execute("""
         INSERT INTO fetch_history (matches_found, new_matches_added, status)
         VALUES (?, ?, ?)
-    """, (
-        all_matches_count,
-        total_new_matches,
-        'success'
-    ))
-    
+    """, (all_matches_count, total_new_matches, 'success'))
     conn.commit()
     
-    # Get total matches in database
-    cursor.execute("SELECT COUNT(*) as count FROM matches")
-    total_in_db = cursor.fetchone()['count']
+    # Final summary
+    print("\n" + "="*50)
+    print("SUMMARY")
+    print("="*50)
+    print(f"Total matches processed: {all_matches_count}")
+    print(f"New matches added: {total_new_matches}")
+    print(f"Existing matches skipped: {total_existing_matches}")
+    print("="*50)
     
     conn.close()
-    
-    print("\n" + "="*50)
-    print("📈 OVERALL SUMMARY:")
-    print(f"  Total matches found: {all_matches_count}")
-    print(f"  New matches added: {total_new_matches}")
-    print(f"  Existing matches skipped: {total_existing_matches}")
-    print(f"  Total matches in database: {total_in_db}")
-    print("="*50)
 
 if __name__ == "__main__":
     asyncio.run(main())
