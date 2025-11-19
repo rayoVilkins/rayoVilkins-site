@@ -630,7 +630,7 @@ jobs:
               win_pct = safe_div(w_local, n_local)*100
               pass_pct_loc = safe_div(pass_made_local, pass_att_local)*100
               gls_pg = safe_div(gf_local, n_local)
-              return win_pct, pass_pct_loc, gpg_w
+              return win_pct, pass_pct_loc, gls_pg
 
             win_w, pass_w, gpg_w = agg_team(mids_with)
             win_wo, pass_wo, gpg_wo = agg_team(mids_without)
