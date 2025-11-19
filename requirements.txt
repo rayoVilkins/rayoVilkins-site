@@ -1,4 +1,2 @@
-requests==2.31.0
-selenium==4.15.2
-cloudscraper==1.2.71
 zendriver==0.15.1
+websockets==13.1
