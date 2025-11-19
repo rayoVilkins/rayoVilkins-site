@@ -10,9 +10,11 @@ import zendriver as zd
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
-YOUR_CLUB_ID = '19798'
+# NOTE: YOUR_CLUB_ID is currently set to '19798' as per your input.
+YOUR_CLUB_ID = '19798' 
 
 # Multiple endpoints for different match types
+# Using the NHL API endpoints as provided in the user's latest code.
 ENDPOINTS = [
     {
         'name': 'League Matches',
@@ -31,6 +33,8 @@ ENDPOINTS = [
 # Database helper functions
 def connect_db():
     """Create and return a connection to the SQLite database."""
+    # Ensure the directory for the database exists
+    os.makedirs(os.path.dirname(DB_PATH) or '.', exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
@@ -90,6 +94,17 @@ def create_tables(conn):
             FOREIGN KEY (club_id) REFERENCES clubs(club_id)
         )
     """)
+
+    # Fetch History table - Added for logging script run results
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fetch_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fetch_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            matches_found INTEGER,
+            new_matches_added INTEGER,
+            status TEXT
+        )
+    """)
     
     conn.commit()
 
@@ -105,6 +120,7 @@ def insert_club(conn, club_data, is_our_club=True):
     club_id = str(club_data.get('clubId'))
     
     if not club_id:
+        # Cannot insert a club without an ID
         return None
 
     club_name = club_data.get('name', '')
@@ -141,26 +157,30 @@ def insert_match_data(conn, match_data):
         return False
     
     if match_exists(conn, match_id):
-        print(f"  ↩️ Match {match_id} already exists, skipping")
+        # Using concise print for skipping
+        print(f"    ⏭️ Match {match_id} already exists, skipping")
         return False
 
     try:
+        # Unix timestamp from API is in seconds
         match_time = datetime.fromtimestamp(match_data.get('timestamp', 0))
         match_type = match_data.get('matchType', 'unknown')
         venue = match_data.get('venue', 'Unknown')
 
-        # Our club data
+        # --- Club Inserts ---
         our_club_data = match_data.get('ourClub', {})
         our_club_id = insert_club(conn, our_club_data, is_our_club=True)
 
-        # Opponent club data
         opp_club_data = match_data.get('opponentClub', {})
         opp_club_id = insert_club(conn, opp_club_data, is_our_club=False)
 
+        if not our_club_id or not opp_club_id:
+            raise ValueError("Missing club ID for match insertion.")
+
+        # --- Match Score & Result ---
         our_score = match_data.get('ourScore', 0)
         opp_score = match_data.get('opponentScore', 0)
 
-        # Determine result
         if our_score > opp_score:
             result = 'W'
         elif our_score < opp_score:
@@ -168,7 +188,7 @@ def insert_match_data(conn, match_data):
         else:
             result = 'D'
 
-        # Insert match
+        # --- Insert Match Record ---
         cursor.execute("""
             INSERT INTO matches (
                 match_id, match_time, match_type, is_home,
@@ -188,7 +208,7 @@ def insert_match_data(conn, match_data):
             venue
         ))
 
-        # Insert player stats (our team)
+        # --- Insert Player Stats (Our Team) ---
         for player in match_data.get('ourPlayers', []):
             cursor.execute("""
                 INSERT INTO player_stats (
@@ -212,7 +232,7 @@ def insert_match_data(conn, match_data):
                 player.get('cleanSheet', 0)
             ))
 
-        # Insert player stats (opponent)
+        # --- Insert Player Stats (Opponent) ---
         for player in match_data.get('opponentPlayers', []):
             cursor.execute("""
                 INSERT INTO player_stats (
@@ -248,10 +268,12 @@ async def fetch_matches_from_api(endpoint_name, url, browser):
     """Fetch JSON match data from EA API using Zendriver to avoid bot detection."""
     print(f"    🌐 Navigating to {url}")
     
+    # We navigate to the API endpoint URL directly
     tab = await browser.get(url)
     
     # Wait for the JSON response from the network
     try:
+        # Wait until we receive the 200 OK response containing the match data
         response = await tab.wait_for_response(lambda r: (
             'proclubs.ea.com/api/nhl/clubs/matches' in r.url
             and r.status == 200
@@ -261,11 +283,14 @@ async def fetch_matches_from_api(endpoint_name, url, browser):
         return []
     
     try:
+        # Get the JSON content from the successful response
         data = await response.json()
     except Exception as e:
+        # Sometimes the API returns an error message that isn't valid JSON, catch that.
         print(f"    ❌ Failed to parse JSON for {endpoint_name}: {e}")
         return []
     
+    # The response is expected to be an object containing a 'matches' list
     matches = data.get('matches', [])
     
     print(f"    ✅ Received {len(matches)} matches from {endpoint_name}")
@@ -278,6 +303,7 @@ async def main():
     print("="*50)
     
     conn = connect_db()
+    create_tables(conn) # Ensure tables exist
 
     total_new_matches = 0
     total_existing_matches = 0
@@ -324,18 +350,31 @@ async def main():
             for match in matches:
                 if insert_match_data(conn, match):
                     new_matches += 1
-                    print(f"    ✅ Match {match['matchId']} added")
+                    # Log successful new match insert. Skip message is inside insert_match_data.
+                    print(f"    ✅ Match {match['matchId']} added") 
                 else:
                     existing_matches += 1
             
-            print(f"  ✅ {endpoint['name']} - New: {new_matches}, Existing: {existing_matches}")
+            print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
             total_new_matches += new_matches
             total_existing_matches += existing_matches
-    
+            
     finally:
         print("\n🧹 Closing browser...")
+        # Use await browser.close() as provided in the user's latest code
         await browser.close()
     
+    # Log the fetch into fetch_history table
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO fetch_history (matches_found, new_matches_added, status)
+            VALUES (?, ?, ?)
+        """, (all_matches_count, total_new_matches, 'success'))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Error logging fetch history: {e}")
+
     # Final summary
     print("\n" + "="*50)
     print("SUMMARY")
@@ -348,4 +387,10 @@ async def main():
     conn.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        sys.exit(1)
