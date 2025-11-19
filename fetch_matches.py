@@ -32,8 +32,8 @@ def fetch_matches_from_api(endpoint_name, url):
     print(f"  Fetching {endpoint_name}...")
     
     try:
-        # Use httpx to make a direct, quick HTTP GET request
-        response = httpx.get(url, timeout=10)
+        # We are increasing the timeout value to 30 seconds to allow for slow server responses.
+        response = httpx.get(url, timeout=30)
         
         # Raise an exception for bad status codes (4xx or 5xx)
         response.raise_for_status() 
@@ -51,6 +51,7 @@ def fetch_matches_from_api(endpoint_name, url):
         print(f"  ❌ Error fetching {endpoint_name} - HTTP Status Error: {e.response.status_code}")
         return []
     except httpx.RequestError as e:
+        # This catches the 'The read operation timed out' error
         print(f"  ❌ Error fetching {endpoint_name} - Network/Request Error: {e}")
         return []
     except Exception as e:
