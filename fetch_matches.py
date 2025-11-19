@@ -157,7 +157,7 @@ def insert_match_data(conn, match):
                 
                 # Insert match_players data
                 cursor.execute("""
-                    INSERT OR IGIGNORE INTO match_players
+                    INSERT OR IGNORE INTO match_players
                     (match_id, club_id, player_id, player_name, goals, assists,
                      clean_sheet_def, clean_sheet_gk, goals_conceded, losses, mom,
                      pass_attempts, passes_made, position, rating, red_cards, saves,
