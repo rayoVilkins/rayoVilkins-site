@@ -55,9 +55,12 @@ jobs:
             libcairo2 \
             libasound2t64 \
             libatspi2.0-0 \
+            libxshmfence1 \
             wget \
             ca-certificates \
             fonts-liberation
+          # Chrome should already be installed on GitHub Actions runners
+          which google-chrome || which chromium-browser || echo "Warning: Chrome not found in PATH"
 
       - name: Install Python dependencies
         run: |
