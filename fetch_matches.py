@@ -169,6 +169,7 @@ async def main():
                 '--disable-setuid-sandbox',      # Another critical sandbox bypass
                 '--disable-dev-shm-usage',       # Fixes resource limitations on GHA runners
                 '--remote-debugging-port=9222',  # Explicitly opens a port for connection
+                '--disable-site-isolation-trials', # Added for extra robustness in CI
 
                 # Other robustness flags
                 '--disable-gpu',
@@ -217,7 +218,8 @@ async def main():
         print(f"\nFATAL ERROR in main execution loop: {e}")
         # Log the failed fetch
         cursor = conn.cursor()
-        cursor.execute(""""
+        # FIX: Removed the extra double quote at the start of the triple-quoted string
+        cursor.execute("""
             INSERT INTO fetch_history (matches_found, new_matches_added, status)
             VALUES (?, ?, ?)
         """, (all_matches_count, total_new_matches, 'failure'))
