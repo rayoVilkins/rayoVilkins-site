@@ -88,10 +88,13 @@ def insert_match_data(conn, match):
     
     try:
         # 1. Insert match header
+        # 👇 FIX: Convert the entire match object to a JSON string
+        raw_json_data = json.dumps(match)
+
         cursor.execute("""
-            INSERT INTO matches (match_id, match_timestamp)
-            VALUES (?, ?)
-        """, (match_id, match.get('timestamp', 0)))
+            INSERT INTO matches (match_id, match_timestamp, raw_json)
+            VALUES (?, ?, ?)
+        """, (match_id, match.get('timestamp', 0), raw_json_data)) # <-- And pass it here
         
         # 2. Insert club data for both clubs
         for club_data in match.get('clubs', {}).values():
@@ -281,6 +284,7 @@ async def main():
                     print(f"    ✅ Match {match['matchId']} added")
                 else:
                     existing_matches += 1
+                    # This message will now be accurate:
                     print(f"    ⏭️ Match {match['matchId']} already exists")
             
             total_new_matches += new_matches
