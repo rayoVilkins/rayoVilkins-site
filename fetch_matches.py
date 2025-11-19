@@ -159,15 +159,17 @@ async def main():
         print("\n🌐 Starting browser...")
         # CRITICAL: Use the known executable path and aggressive CI flags
         browser = await zd.start(
-            headless=True,
-            no_sandbox=True,
+            # Using headless=True is the older way; keeping the new way in args is better
+            headless=True, # Keeping this here for compatibility, but the args are more important
+            no_sandbox=True, # Critical flag
             browser_executable_path="/usr/bin/google-chrome",
+            timeout=30, # Increased timeout to 30 seconds for browser startup
             browser_args=[
-                # Recommended fixes for CI/Docker environments:
+                # Recommended fixes for CI/Docker environments (Ensure these are present):
                 '--headless=new',                # Use the new, more reliable headless mode
                 '--no-sandbox',                  # Necessary in most containerized environments
                 '--disable-setuid-sandbox',      # Another critical sandbox bypass
-                '--disable-dev-shm-usage',       # Fixes resource limitations on GHA runners
+                '--disable-dev-shm-usage',       # Fixes resource limitations on GHA runners (CRITICAL FIX)
                 '--remote-debugging-port=9222',  # Explicitly opens a port for connection
                 '--disable-site-isolation-trials', # Added for extra robustness in CI
 
@@ -176,7 +178,7 @@ async def main():
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--disable-software-rasterizer',
-                
+                '--single-process',             # Added this as another strong fix for CI stability
             ]
         )
         print("✅ Browser started successfully.")
@@ -218,12 +220,17 @@ async def main():
         print(f"\nFATAL ERROR in main execution loop: {e}")
         # Log the failed fetch
         cursor = conn.cursor()
-        # FIX: Removed the extra double quote at the start of the triple-quoted string
-        cursor.execute("""
-            INSERT INTO fetch_history (matches_found, new_matches_added, status)
-            VALUES (?, ?, ?)
-        """, (all_matches_count, total_new_matches, 'failure'))
-        conn.commit()
+        # FIX: Ensure this block runs even if the browser startup fails and 'browser' is None
+        try:
+            cursor.execute("""
+                INSERT INTO fetch_history (matches_found, new_matches_added, status)
+                VALUES (?, ?, ?)
+            """, (all_matches_count, total_new_matches, 'failure'))
+            conn.commit()
+        except Exception as db_e:
+            print(f"  ❌ Error logging failure to DB: {db_e}")
+        # Reraise the original error to fail the workflow
+        raise 
     
     finally:
         # Clean up browser
@@ -262,5 +269,7 @@ if __name__ == '__main__':
         # Catch any unexpected top-level exceptions
         print(f"\n--- TOP LEVEL EXECUTION ERROR ---")
         print(f"An unhandled exception occurred: {e}")
+        # We don't need to re-raise here because the `main`'s error handling already did it.
+        # But we keep this for ultimate safety.
         # Reraise to ensure the GitHub Action fails
         raise
