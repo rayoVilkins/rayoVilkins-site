@@ -1,4 +1,5 @@
 name: Build & publish static site
+
 on:
   schedule:
     - cron: "0 5 * * *"    # daily at 05:00 UTC
@@ -7,29 +8,33 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - 'sql/seed_data.sql'  # avoid loops when we commit updated seed
+
 permissions:
   contents: write
   pages: write
   id-token: write
+
 concurrency:
   group: "pages"
   cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install system dependencies for Zendriver
         run: |
-          # This step installs all necessary system dependencies for running 
-          # a headless Chromium browser (used by zendriver) in the CI environment.
           sudo apt-get update
           sudo apt-get install -y \
             sqlite3 \
@@ -56,16 +61,19 @@ jobs:
             fonts-liberation
           # Chrome should already be installed on GitHub Actions runners
           which google-chrome || which chromium-browser || echo "Warning: Chrome not found in PATH"
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Prepare folders
         run: |
           mkdir -p build
           mkdir -p public/api/matches
           mkdir -p public/api/players
           mkdir -p sql
+
       # ⭐ If seed exists, import it; otherwise create empty schema+views
       - name: Prepare database (seed or fresh)
         env:
@@ -79,11 +87,13 @@ jobs:
             sqlite3 "$DB_PATH" < sql/create_tables.sql
             sqlite3 "$DB_PATH" < sql/create_views.sql
           fi
+
       - name: Fetch EA data into DB (using Zendriver for bot detection evasion)
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
           python fetch_matches.py
+
       # ⭐ Re-dump data so history accumulates across runs
       - name: Dump updated seed (data+schema for safety)
         env:
@@ -92,6 +102,7 @@ jobs:
           # Full dump (schema + data) keeps things robust if schema evolves
           sqlite3 "$DB_PATH" .dump > sql/seed_data.sql
           test -s sql/seed_data.sql && echo "seed_data.sql written."
+
       - name: Commit updated seed to repo
         run: |
           git config user.name "github-actions[bot]"
@@ -103,6 +114,7 @@ jobs:
           else
             echo "No changes in seed_data.sql to commit."
           fi
+
       - name: Export JSON endpoints
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
@@ -110,19 +122,24 @@ jobs:
           python - << 'PY'
           import os, json, sqlite3, pathlib, math
           from collections import defaultdict, Counter
+
           DB_PATH = os.environ["DB_PATH"]
           out = pathlib.Path("public/api")
           out.mkdir(parents=True, exist_ok=True)
+
           def q(conn, sql, args=()):
             c = conn.cursor()
             c.execute(sql, args)
             cols = [d[0] for d in c.description]
             return [dict(zip(cols, r)) for r in c.fetchall()]
+
           def q1(conn, sql, args=()):
             rows = q(conn, sql, args)
             return rows[0] if rows else None
+
           def safe_div(a, b):
             return (a / b) if b else 0.0
+
           def coeff_of_variation(values):
             vals = [v for v in values if v is not None]
             n = len(vals)
@@ -131,6 +148,7 @@ jobs:
             if mean == 0: return 0.0
             var = sum((v-mean)**2 for v in vals) / (n-1)
             return math.sqrt(var) / abs(mean)
+
           def percentile(values, p):
             vals = sorted(v for v in values if v is not None)
             if not vals: return 0.0
@@ -138,11 +156,13 @@ jobs:
             f = math.floor(k); c = math.ceil(k)
             if f == c: return float(vals[int(k)])
             return float(vals[f]*(c-k) + vals[c]*(k-f))
+
           def jaccard(a_set, b_set):
             if not a_set and not b_set: return 1.0
             inter = len(a_set & b_set)
             union = len(a_set | b_set)
             return safe_div(inter, union)
+
           def calculate_head_to_head(conn, our_club_id, opponent_club_id, current_match_id):
             h2h_matches = q(conn, """
               SELECT 
@@ -179,8 +199,10 @@ jobs:
                 'team_id': opponent_team_id
               }
             }
+
           conn = sqlite3.connect(DB_PATH)
           conn.row_factory = sqlite3.Row
+
           # 1) Enhanced Matches with aggregate data
           matches = q(conn, """
             SELECT 
@@ -231,10 +253,12 @@ jobs:
                 'opp_tackle_attempts': opp_agg.get('tackleattempts', 0)
             })
             enhanced_matches.append(enhanced_match)
+
           (out / "matches" / "all.json").write_text(
             json.dumps({"success": True, "count": len(enhanced_matches), "matches": enhanced_matches}),
             encoding="utf-8"
           )
+
           # 2) Player rankings
           POS = ["all","ST","AM","DM","DF","GK"]
           for pos in POS:
@@ -299,6 +323,7 @@ jobs:
               json.dumps({"success": True, "position_filter": pos, "count": len(rows), "players": rows}),
               encoding="utf-8"
             )
+
           # 3) Per-match detailed files with head-to-head
           for m in matches:
             mid = m["match_id"]
@@ -329,6 +354,7 @@ jobs:
               "aggregates": aggregates,
               "head_to_head": head_to_head
             }), encoding="utf-8")
+
           # 4) Season-level summary (complete logic from user's file)
           n = len(enhanced_matches)
           wins = sum(1 for m in enhanced_matches if m['result'] == 'W')
@@ -339,6 +365,7 @@ jobs:
           goal_diff = gf - ga
           points = 3*wins + 1*draws
           ppg = safe_div(points, n)
+
           pass_pct_per_match = []
           tackle_pct_per_match = []
           shot_pct_per_match = []
@@ -351,6 +378,7 @@ jobs:
           margin_counts = Counter()
           one_goal_games = 0
           one_goal_wins = 0
+
           roster_by_match = {}
           for m in enhanced_matches:
             players = q(conn, """
@@ -358,8 +386,10 @@ jobs:
               WHERE match_id = ? AND club_id = '19798'
             """, (m['match_id'],))
             roster_by_match[m['match_id']] = set(p['player_id'] for p in players)
+
           lineup_stability_scores = []
           prev_set = None
+
           for m in enhanced_matches:
             pass_pct = safe_div(m['our_passes_made'], m['our_pass_attempts']) * 100
             tack_pct = safe_div(m['our_tackles_made'], m['our_tackle_attempts']) * 100
@@ -371,29 +401,36 @@ jobs:
             shot_pct_per_match.append(shot_pct)
             save_pct_per_match.append(save_pct)
             pdo_per_match.append((shot_pct + save_pct))
+
             poss_share = safe_div(m['our_pass_attempts'], (m['our_pass_attempts'] + m['opp_pass_attempts']))
             field_tilt = safe_div(m['our_shots'], (m['our_shots'] + m['opp_shots']))
             poss_share_per_match.append(poss_share)
             field_tilt_per_match.append(field_tilt)
+
             gf_per_match.append(float(m['our_goals']))
             ga_per_match.append(float(m['opponent_goals']))
+
             margin = m['our_goals'] - m['opponent_goals']
             if margin >= 2: margin_counts['win_by_2plus'] += 1
             elif margin == 1: margin_counts['win_by_1'] += 1
             elif margin == 0: margin_counts['draw'] += 1
             elif margin == -1: margin_counts['loss_by_1'] += 1
             else: margin_counts['loss_by_2plus'] += 1
+
             if abs(margin) == 1:
               one_goal_games += 1
               if margin == 1: one_goal_wins += 1
+
             curr_set = roster_by_match.get(m['match_id'], set())
             if prev_set is not None:
               lineup_stability_scores.append(jaccard(prev_set, curr_set))
             prev_set = curr_set
+
           poss_mean = (sum(poss_share_per_match)/n) if n else 0.0
           poss_std  = (coeff_of_variation(poss_share_per_match) * poss_mean) if n else 0.0
           tilt_mean = (sum(field_tilt_per_match)/n) if n else 0.0
           tilt_std  = (coeff_of_variation(field_tilt_per_match) * tilt_mean) if n else 0.0
+
           our_pass_attempts_list = [m['our_pass_attempts'] for m in enhanced_matches]
           our_shots_list = [m['our_shots'] for m in enhanced_matches]
           def zize(vals):
@@ -406,29 +443,35 @@ jobs:
           z_pass = zize(our_pass_attempts_list)
           z_shot = zize(our_shots_list)
           style_index = sum((zp - zs) for zp, zs in zip(z_pass, z_shot))/len(z_pass) if z_pass else 0.0
+
           total_passes_made = sum(m['our_passes_made'] for m in enhanced_matches)
           total_pass_attempts = sum(m['our_pass_attempts'] for m in enhanced_matches)
           total_tackles_made = sum(m['our_tackles_made'] for m in enhanced_matches)
           total_tackle_attempts = sum(m['our_tackle_attempts'] for m in enhanced_matches)
           total_shots = sum(m['our_shots'] for m in enhanced_matches)
           total_opp_shots = sum(m['opp_shots'] for m in enhanced_matches)
+
           season_pass_pct = safe_div(total_passes_made, total_pass_attempts)*100
           season_tackle_pct = safe_div(total_tackles_made, total_tackle_attempts)*100
           season_shot_pct = safe_div(gf, total_shots)*100
           season_save_pct = (1.0 - safe_div(ga, total_opp_shots))*100 if total_opp_shots>0 else 0.0
+
           pdo_mean = (season_shot_pct + season_save_pct)
           pdo_p10  = percentile(pdo_per_match, 10)
           pdo_p90  = percentile(pdo_per_match, 90)
+
           scoreline_dist = {k: safe_div(v, n)*100 for k, v in margin_counts.items()}
           clean_sheet_rate = safe_div(sum(1 for m in enhanced_matches if m['opponent_goals']==0), n)*100
           two_plus_goals_rate = safe_div(sum(1 for m in enhanced_matches if m['our_goals']>=2), n)*100
           one_goal_edge = safe_div(one_goal_wins, one_goal_games)*100 if one_goal_games>0 else 0.0
+
           cv_pass = coeff_of_variation(pass_pct_per_match)*100
           cv_shot = coeff_of_variation(shot_pct_per_match)*100
           cv_tackle = coeff_of_variation(tackle_pct_per_match)*100
           cv_gf = coeff_of_variation(gf_per_match)*100
           cv_ga = coeff_of_variation(ga_per_match)*100
           lineup_stability_avg = (sum(lineup_stability_scores)/len(lineup_stability_scores)*100) if lineup_stability_scores else 0.0
+
           def rolling(values, window):
             out_r = []
             for i in range(len(values)):
@@ -444,6 +487,7 @@ jobs:
                   mean_prev10 = sum(prev10)/10
                   if abs(roll5[i] - mean_prev10) >= 5.0:
                     change_point_count += 1
+
           def type_metrics(type_name):
             mm = [m for m in enhanced_matches if (m['match_type']==type_name)]
             if not mm: return {"count":0}
@@ -461,8 +505,10 @@ jobs:
             aggs['pass_pct'] = safe_div(pm, pa)*100
             aggs['shot_pct'] = safe_div(gf2, sh)*100
             return aggs
+
           match_types = [r['match_type'] for r in q(conn, "SELECT DISTINCT match_type FROM match_clubs WHERE club_id='19798'")]
           splits_by_type = {str(t): type_metrics(t) for t in match_types}
+
           def archetype_buckets():
             buckets = {
               'opp_high_possession': [],
@@ -491,6 +537,7 @@ jobs:
               }
             return {k: pack(v) for k, v in buckets.items()}
           splits_by_archetype = archetype_buckets()
+
           thirds = {'early': [], 'mid': [], 'late': []}
           if n:
             cut1 = n//3
@@ -514,6 +561,7 @@ jobs:
               'shot_pct': shot_pct4
             }
           splits_by_period = {k: pack_period(v) for k,v in thirds.items()}
+
           opp_counter = Counter(m['opponent_team_id'] for m in enhanced_matches)
           top_opponents = [tid for tid,_ in opp_counter.most_common(10)]
           season_pass_pct_baseline = season_pass_pct
@@ -538,6 +586,7 @@ jobs:
               'pass_delta_vs_season': (pass_pct_h2h - season_pass_pct_baseline),
               'shot_delta_vs_season': (shot_pct_h2h - season_shot_pct_baseline)
             })
+
           match_players = {}
           all_player_ids = set()
           for m in enhanced_matches:
@@ -548,11 +597,13 @@ jobs:
             """, (m['match_id'],))
             match_players[m['match_id']] = rows
             all_player_ids.update(r['player_id'] for r in rows)
+
           match_pass_made = {m['match_id']: m['our_passes_made'] for m in enhanced_matches}
           match_pass_att  = {m['match_id']: m['our_pass_attempts'] for m in enhanced_matches}
           match_shots     = {m['match_id']: m['our_shots'] for m in enhanced_matches}
           match_gf        = {m['match_id']: m['our_goals'] for m in enhanced_matches}
           match_result    = {m['match_id']: m['result'] for m in enhanced_matches}
+
           with_without = []
           min_apps = 5
           player_matches = defaultdict(set)
@@ -561,11 +612,13 @@ jobs:
             for r in rows:
               player_matches[r['player_id']].add(mid)
               player_names[r['player_id']] = r['player_name']
+
           all_match_ids = set(m['match_id'] for m in enhanced_matches)
           for pid, mids_with in player_matches.items():
             if len(mids_with) < min_apps: continue
             mids_without = list(all_match_ids - mids_with)
             mids_with = list(mids_with)
+
             def agg_team(metrics_mids):
               if not metrics_mids: 
                 return 0.0, 0.0, 0.0
@@ -577,9 +630,11 @@ jobs:
               win_pct = safe_div(w_local, n_local)*100
               pass_pct_loc = safe_div(pass_made_local, pass_att_local)*100
               gls_pg = safe_div(gf_local, n_local)
-              return win_pct, pass_pct_loc, gls_pg
+              return win_pct, pass_pct_loc, gpg_w
+
             win_w, pass_w, gpg_w = agg_team(mids_with)
             win_wo, pass_wo, gpg_wo = agg_team(mids_without)
+
             with_without.append({
               'player_id': pid,
               'player_name': player_names.get(pid, str(pid)),
@@ -589,6 +644,7 @@ jobs:
               'delta_pass_pct': (pass_w - pass_wo),
               'delta_goals_for_per_game': (gpg_w - gpg_wo)
             })
+
           pair_stats = defaultdict(lambda: {'matches':0, 'goals':0, 'assists':0})
           for mid, rows in match_players.items():
             ids = [r['player_id'] for r in rows]
@@ -611,6 +667,7 @@ jobs:
             })
           top_pairs.sort(key=lambda x: x['goal_contrib_per_game'], reverse=True)
           top_pairs = top_pairs[:10]
+
           season_summary = {
             "success": True,
             "season_totals": {
@@ -666,27 +723,6 @@ jobs:
 
           conn.close()
           PY
-      - name: Copy static assets
-        run: cp -r static/* build/
-
-      - name: Get latest build number
-        id: build_number
-        uses: "actions/github-script@v6"
-        with:
-          script: |
-            const fs = require('fs');
-            const data = fs.readFileSync('build/index.html', 'utf8');
-            const buildNumber = data.match(/Build\s(\d+)/)?.[1] || '0';
-            core.setOutput('build_number', parseInt(buildNumber) + 1);
-            
-      - name: Update build number
-        run: |
-          BUILD_NUMBER="${{ steps.build_number.outputs.build_number }}"
-          if [ -z "$BUILD_NUMBER" ] || [ "$BUILD_NUMBER" = "0" ]; then
-            BUILD_NUMBER=1
-          fi
-          sed -i "s|Build 0|Build $BUILD_NUMBER|g" build/index.html
-          echo "Updated build number to $BUILD_NUMBER"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -694,8 +730,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'build'
+          path: public
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
