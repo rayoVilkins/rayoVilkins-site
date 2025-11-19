@@ -1,10 +1,14 @@
-import cloudscraper
 import json
 import sqlite3
 from datetime import datetime
 import time
 import os
-import random
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
@@ -22,43 +26,87 @@ ENDPOINTS = [
     }
 ]
 
-def fetch_matches_from_api(endpoint_name, url):
-    """Fetch matches from EA API using cloudscraper to bypass bot detection"""
+def create_driver():
+    """Create a Selenium WebDriver with Chrome"""
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')  # Run in background
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
     
-    # Create cloudscraper session (automatically handles anti-bot challenges)
-    scraper = cloudscraper.create_scraper(
-        browser={
-            'browser': 'chrome',
-            'platform': 'windows',
-            'mobile': False
-        }
-    )
+    # Disable webdriver detection
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    
+    # User agent
+    chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+    
+    driver = webdriver.Chrome(options=chrome_options)
+    
+    # Remove webdriver property
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    
+    return driver
+
+def fetch_matches_from_api_selenium(endpoint_name, url, driver):
+    """Fetch matches from EA API using Selenium"""
     
     for attempt in range(3):
         try:
             print(f"  Fetching {endpoint_name} (attempt {attempt + 1}/3)...")
             
-            # Add small random delay to mimic human behavior
+            # Add delay between attempts
             if attempt > 0:
-                delay = random.uniform(2, 4)
-                print(f"    Waiting {delay:.1f} seconds before retry...")
+                delay = 5 + (attempt * 2)
+                print(f"    Waiting {delay} seconds before retry...")
                 time.sleep(delay)
             else:
-                time.sleep(random.uniform(0.5, 1.5))
+                time.sleep(2)
             
-            timeout = 30 + (attempt * 10)
+            # Navigate to URL
+            driver.get(url)
             
-            # Cloudscraper automatically handles cookies and headers
-            response = scraper.get(url, timeout=timeout)
-            response.raise_for_status()
-            data = response.json()
+            # Wait for page to load (up to 30 seconds)
+            time.sleep(3)
+            
+            # Get page source
+            page_source = driver.page_source
+            
+            # Check if we got JSON response or HTML error page
+            if '<html' in page_source.lower() or '403' in page_source:
+                print(f"    Received HTML error page instead of JSON")
+                if attempt < 2:
+                    continue
+                else:
+                    print(f"  ✗ Failed to fetch {endpoint_name} - Access Forbidden")
+                    return None
+            
+            # Try to parse as JSON
+            # The JSON is usually in a <pre> tag or directly in body
+            try:
+                # Try to find pre tag first
+                pre_element = driver.find_element(By.TAG_NAME, "pre")
+                json_text = pre_element.text
+            except:
+                # If no pre tag, use body
+                json_text = driver.find_element(By.TAG_NAME, "body").text
+            
+            data = json.loads(json_text)
             print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
             return data
             
+        except json.JSONDecodeError as e:
+            print(f"    Failed to parse JSON on attempt {attempt + 1}: {e}")
+            if attempt < 2:
+                continue
+            else:
+                print(f"  ✗ Failed to fetch {endpoint_name}")
+                return None
+                
         except Exception as e:
             print(f"    Error on attempt {attempt + 1}: {e}")
             if attempt < 2:
-                time.sleep(3)
                 continue
             else:
                 print(f"  ✗ Failed to fetch {endpoint_name}")
@@ -247,10 +295,20 @@ def insert_match_data(conn, match):
 def main():
     """Main function to fetch and store matches from multiple endpoints"""
     print("="*50)
-    print("PRO CLUBS MATCH DATA FETCHER (CLOUDSCRAPER)")
+    print("PRO CLUBS MATCH DATA FETCHER (SELENIUM)")
     print("="*50)
     print(f"Club ID: {YOUR_CLUB_ID}")
     print("="*50)
+    
+    # Create Selenium driver
+    print("\n🌐 Initializing browser...")
+    try:
+        driver = create_driver()
+        print("  ✓ Browser initialized")
+    except Exception as e:
+        print(f"  ✗ Failed to initialize browser: {e}")
+        print("\n⚠️ Make sure Chrome and ChromeDriver are installed!")
+        return
     
     conn = connect_db()
     
@@ -258,32 +316,38 @@ def main():
     total_existing_matches = 0
     all_matches_count = 0
     
-    # Fetch from each endpoint
-    for endpoint in ENDPOINTS:
-        print(f"\n📡 Fetching {endpoint['name']}...")
-        matches = fetch_matches_from_api(endpoint['name'], endpoint['url'])
-        
-        if not matches:
-            print(f"  ❌ No data fetched for {endpoint['name']}")
-            continue
-        
-        all_matches_count += len(matches)
-        new_matches = 0
-        existing_matches = 0
-        
-        print(f"  📝 Processing {len(matches)} matches...")
-        for match in matches:
-            if insert_match_data(conn, match):
-                new_matches += 1
-                print(f"    ✅ Match {match['matchId']} added")
-            else:
-                existing_matches += 1
-                print(f"    ⏭️ Match {match['matchId']} already exists")
-        
-        total_new_matches += new_matches
-        total_existing_matches += existing_matches
-        
-        print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
+    try:
+        # Fetch from each endpoint
+        for endpoint in ENDPOINTS:
+            print(f"\n📡 Fetching {endpoint['name']}...")
+            matches = fetch_matches_from_api_selenium(endpoint['name'], endpoint['url'], driver)
+            
+            if not matches:
+                print(f"  ❌ No data fetched for {endpoint['name']}")
+                continue
+            
+            all_matches_count += len(matches)
+            new_matches = 0
+            existing_matches = 0
+            
+            print(f"  📝 Processing {len(matches)} matches...")
+            for match in matches:
+                if insert_match_data(conn, match):
+                    new_matches += 1
+                    print(f"    ✅ Match {match['matchId']} added")
+                else:
+                    existing_matches += 1
+                    print(f"    ⏭️ Match {match['matchId']} already exists")
+            
+            total_new_matches += new_matches
+            total_existing_matches += existing_matches
+            
+            print(f"  📊 {endpoint['name']} Summary: {new_matches} new, {existing_matches} existing")
+    
+    finally:
+        # Always close the browser
+        print("\n🔒 Closing browser...")
+        driver.quit()
     
     # Log the fetch
     cursor = conn.cursor()
