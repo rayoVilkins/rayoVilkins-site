@@ -455,7 +455,9 @@
   function switchTab(tab){ document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.querySelector(`[data-tab="${tab}"]`).classList.add('active'); document.getElementById(tab).classList.add('active'); }
 
   async function getJSON(path){
-    const res = await fetch(`${API_BASE}${path}`);
+    // 👇 FIX: Add a unique timestamp to every request to "bust" the browser cache
+    const cacheBust = `?v=${new Date().getTime()}`;
+    const res = await fetch(`${API_BASE}${path}${cacheBust}`);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
