@@ -1,14 +1,9 @@
+import asyncio
+import zendriver as zd
 import json
 import sqlite3
 from datetime import datetime
-import time
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # Configuration
 DB_PATH = os.environ.get('DB_PATH', 'build/proclubs.db')
@@ -26,55 +21,32 @@ ENDPOINTS = [
     }
 ]
 
-def create_driver():
-    """Create a Selenium WebDriver with Chrome"""
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')  # Run in background
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    
-    # Disable webdriver detection
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    
-    # User agent
-    chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-    
-    driver = webdriver.Chrome(options=chrome_options)
-    
-    # Remove webdriver property
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    
-    return driver
-
-def fetch_matches_from_api_selenium(endpoint_name, url, driver):
-    """Fetch matches from EA API using Selenium"""
+async def fetch_matches_from_api(endpoint_name, url, browser):
+    """Fetch matches from EA API using zendriver (undetectable CDP)"""
     
     for attempt in range(3):
         try:
             print(f"  Fetching {endpoint_name} (attempt {attempt + 1}/3)...")
             
-            # Add delay between attempts
+            # Small delay between attempts
             if attempt > 0:
-                delay = 5 + (attempt * 2)
+                delay = 3 + (attempt * 2)
                 print(f"    Waiting {delay} seconds before retry...")
-                time.sleep(delay)
+                await asyncio.sleep(delay)
             else:
-                time.sleep(2)
+                await asyncio.sleep(1)
             
-            # Navigate to URL
-            driver.get(url)
+            # Navigate to the API URL
+            page = await browser.get(url)
             
-            # Wait for page to load (up to 30 seconds)
-            time.sleep(3)
+            # Wait a moment for content to load
+            await asyncio.sleep(2)
             
-            # Get page source
-            page_source = driver.page_source
+            # Get the page content
+            content = await page.get_content()
             
-            # Check if we got JSON response or HTML error page
-            if '<html' in page_source.lower() or '403' in page_source:
+            # Check if we got JSON or HTML error page
+            if '<html' in content.lower() or '403' in content or 'forbidden' in content.lower():
                 print(f"    Received HTML error page instead of JSON")
                 if attempt < 2:
                     continue
@@ -83,30 +55,22 @@ def fetch_matches_from_api_selenium(endpoint_name, url, driver):
                     return None
             
             # Try to parse as JSON
-            # The JSON is usually in a <pre> tag or directly in body
             try:
-                # Try to find pre tag first
-                pre_element = driver.find_element(By.TAG_NAME, "pre")
-                json_text = pre_element.text
-            except:
-                # If no pre tag, use body
-                json_text = driver.find_element(By.TAG_NAME, "body").text
-            
-            data = json.loads(json_text)
-            print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
-            return data
-            
-        except json.JSONDecodeError as e:
-            print(f"    Failed to parse JSON on attempt {attempt + 1}: {e}")
-            if attempt < 2:
-                continue
-            else:
-                print(f"  ✗ Failed to fetch {endpoint_name}")
-                return None
-                
+                data = json.loads(content)
+                print(f"  ✓ Successfully fetched {len(data)} {endpoint_name}")
+                return data
+            except json.JSONDecodeError:
+                print(f"    Failed to parse response as JSON")
+                if attempt < 2:
+                    continue
+                else:
+                    print(f"  ✗ Failed to fetch {endpoint_name}")
+                    return None
+                    
         except Exception as e:
             print(f"    Error on attempt {attempt + 1}: {e}")
             if attempt < 2:
+                await asyncio.sleep(3)
                 continue
             else:
                 print(f"  ✗ Failed to fetch {endpoint_name}")
@@ -292,23 +256,18 @@ def insert_match_data(conn, match):
         print(f"    ⚠️ Error inserting match {match_id}: {e}")
         return False
 
-def main():
+async def main():
     """Main function to fetch and store matches from multiple endpoints"""
     print("="*50)
-    print("PRO CLUBS MATCH DATA FETCHER (SELENIUM)")
+    print("PRO CLUBS MATCH DATA FETCHER (ZENDRIVER)")
     print("="*50)
     print(f"Club ID: {YOUR_CLUB_ID}")
     print("="*50)
     
-    # Create Selenium driver
-    print("\n🌐 Initializing browser...")
-    try:
-        driver = create_driver()
-        print("  ✓ Browser initialized")
-    except Exception as e:
-        print(f"  ✗ Failed to initialize browser: {e}")
-        print("\n⚠️ Make sure Chrome and ChromeDriver are installed!")
-        return
+    # Start zendriver browser
+    print("\n🌐 Initializing undetectable browser...")
+    browser = await zd.start(headless=True)
+    print("  ✓ Browser initialized")
     
     conn = connect_db()
     
@@ -320,7 +279,7 @@ def main():
         # Fetch from each endpoint
         for endpoint in ENDPOINTS:
             print(f"\n📡 Fetching {endpoint['name']}...")
-            matches = fetch_matches_from_api_selenium(endpoint['name'], endpoint['url'], driver)
+            matches = await fetch_matches_from_api(endpoint['name'], endpoint['url'], browser)
             
             if not matches:
                 print(f"  ❌ No data fetched for {endpoint['name']}")
@@ -347,7 +306,7 @@ def main():
     finally:
         # Always close the browser
         print("\n🔒 Closing browser...")
-        driver.quit()
+        await browser.stop()
     
     # Log the fetch
     cursor = conn.cursor()
@@ -377,4 +336,4 @@ def main():
     print("="*50)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
