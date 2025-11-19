@@ -64,7 +64,7 @@ jobs:
             sqlite3 "$DB_PATH" < sql/create_views.sql
           fi
 
-      - name: Fetch EA data into DB
+      - name: Fetch EA data into DB (using cloudscraper for Akamai bypass)
         env:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
@@ -179,9 +179,7 @@ jobs:
           conn = sqlite3.connect(DB_PATH)
           conn.row_factory = sqlite3.Row
 
-          # ------------------------------------------------------------
-          # 1) Enhanced Matches with aggregate data (keep existing)
-          # ------------------------------------------------------------
+          # 1) Enhanced Matches with aggregate data
           matches = q(conn, """
             SELECT 
               m.match_id,
@@ -237,9 +235,7 @@ jobs:
             encoding="utf-8"
           )
 
-          # ------------------------------------------------------------
-          # 2) Player rankings (keep existing)
-          # ------------------------------------------------------------
+          # 2) Player rankings
           POS = ["all","ST","AM","DM","DF","GK"]
           for pos in POS:
             where_pos = {
@@ -304,9 +300,7 @@ jobs:
               encoding="utf-8"
             )
 
-          # ------------------------------------------------------------
-          # 3) Per-match detailed files with head-to-head (keep existing)
-          # ------------------------------------------------------------
+          # 3) Per-match detailed files with head-to-head
           for m in matches:
             mid = m["match_id"]
             clubs = q(conn, "SELECT * FROM match_clubs WHERE match_id = ?", (mid,))
@@ -337,11 +331,7 @@ jobs:
               "head_to_head": head_to_head
             }), encoding="utf-8")
 
-          # ------------------------------------------------------------
-          # 4) NEW: Season-level (aggregate) summary (B → H, no A)
-          # ------------------------------------------------------------
-          # Build per-match derived values internally (final output is aggregate-only)
-          # We'll use enhanced_matches created above.
+          # 4) Season-level summary (complete logic from user's file)
           n = len(enhanced_matches)
           wins = sum(1 for m in enhanced_matches if m['result'] == 'W')
           draws = sum(1 for m in enhanced_matches if m['result'] == 'D')
@@ -352,28 +342,19 @@ jobs:
           points = 3*wins + 1*draws
           ppg = safe_div(points, n)
 
-          # Per-match conversion stats
           pass_pct_per_match = []
           tackle_pct_per_match = []
           shot_pct_per_match = []
           save_pct_per_match = []
           pdo_per_match = []
-
-          # Identity proxies
           poss_share_per_match = []
           field_tilt_per_match = []
-
-          # Team GF/GA per match arrays
           gf_per_match = []
           ga_per_match = []
-
-          # Result margin buckets
           margin_counts = Counter()
-          # One-goal game edge
           one_goal_games = 0
           one_goal_wins = 0
 
-          # Lineup stability: need XI per match for our club
           roster_by_match = {}
           for m in enhanced_matches:
             players = q(conn, """
@@ -385,9 +366,7 @@ jobs:
           lineup_stability_scores = []
           prev_set = None
 
-          # Build all per-match derived fields (internal only)
           for m in enhanced_matches:
-            # Conversions
             pass_pct = safe_div(m['our_passes_made'], m['our_pass_attempts']) * 100
             tack_pct = safe_div(m['our_tackles_made'], m['our_tackle_attempts']) * 100
             shot_pct = safe_div(m['our_goals'], m['our_shots']) * 100
@@ -399,17 +378,14 @@ jobs:
             save_pct_per_match.append(save_pct)
             pdo_per_match.append((shot_pct + save_pct))
 
-            # Identity
             poss_share = safe_div(m['our_pass_attempts'], (m['our_pass_attempts'] + m['opp_pass_attempts']))
             field_tilt = safe_div(m['our_shots'], (m['our_shots'] + m['opp_shots']))
-            poss_share_per_match.append(possess_share := poss_share)
+            poss_share_per_match.append(poss_share)
             field_tilt_per_match.append(field_tilt)
 
-            # GF/GA
             gf_per_match.append(float(m['our_goals']))
             ga_per_match.append(float(m['opponent_goals']))
 
-            # Margins & one-goal edge
             margin = m['our_goals'] - m['opponent_goals']
             if margin >= 2: margin_counts['win_by_2plus'] += 1
             elif margin == 1: margin_counts['win_by_1'] += 1
@@ -421,20 +397,16 @@ jobs:
               one_goal_games += 1
               if margin == 1: one_goal_wins += 1
 
-            # Lineup stability
             curr_set = roster_by_match.get(m['match_id'], set())
             if prev_set is not None:
               lineup_stability_scores.append(jaccard(prev_set, curr_set))
             prev_set = curr_set
 
-          # Overall identity metrics
           poss_mean = (sum(poss_share_per_match)/n) if n else 0.0
           poss_std  = (coeff_of_variation(poss_share_per_match) * poss_mean) if n else 0.0
           tilt_mean = (sum(field_tilt_per_match)/n) if n else 0.0
           tilt_std  = (coeff_of_variation(field_tilt_per_match) * tilt_mean) if n else 0.0
 
-          # Style index (build-up vs direct): z(passes per match) - z(shots per match)
-          # Use per-match totals for our team
           our_pass_attempts_list = [m['our_pass_attempts'] for m in enhanced_matches]
           our_shots_list = [m['our_shots'] for m in enhanced_matches]
           def zize(vals):
@@ -448,7 +420,6 @@ jobs:
           z_shot = zize(our_shots_list)
           style_index = sum((zp - zs) for zp, zs in zip(z_pass, z_shot))/len(z_pass) if z_pass else 0.0
 
-          # Efficiency funnel (season-level)
           total_passes_made = sum(m['our_passes_made'] for m in enhanced_matches)
           total_pass_attempts = sum(m['our_pass_attempts'] for m in enhanced_matches)
           total_tackles_made = sum(m['our_tackles_made'] for m in enhanced_matches)
@@ -465,13 +436,11 @@ jobs:
           pdo_p10  = percentile(pdo_per_match, 10)
           pdo_p90  = percentile(pdo_per_match, 90)
 
-          # Outcome profile
           scoreline_dist = {k: safe_div(v, n)*100 for k, v in margin_counts.items()}
           clean_sheet_rate = safe_div(sum(1 for m in enhanced_matches if m['opponent_goals']==0), n)*100
           two_plus_goals_rate = safe_div(sum(1 for m in enhanced_matches if m['our_goals']>=2), n)*100
           one_goal_edge = safe_div(one_goal_wins, one_goal_games)*100 if one_goal_games>0 else 0.0
 
-          # Consistency (CV%)
           cv_pass = coeff_of_variation(pass_pct_per_match)*100
           cv_shot = coeff_of_variation(shot_pct_per_match)*100
           cv_tackle = coeff_of_variation(tackle_pct_per_match)*100
@@ -479,8 +448,6 @@ jobs:
           cv_ga = coeff_of_variation(ga_per_match)*100
           lineup_stability_avg = (sum(lineup_stability_scores)/len(lineup_stability_scores)*100) if lineup_stability_scores else 0.0
 
-          # Change-point detection (simple): count points where 5-game rolling mean differs
-          # from previous 10-game mean by >= 5 percentage points for pass/shot/tackle.
           def rolling(values, window):
             out_r = []
             for i in range(len(values)):
@@ -491,14 +458,12 @@ jobs:
             if len(series)>=16:
               roll5 = rolling(series, 5)
               for i in range(15, len(series)):
-                prev10 = series[max(0,i-14):i-4]  # 10 items ending 5 back
+                prev10 = series[max(0,i-14):i-4]
                 if len(prev10)==10:
                   mean_prev10 = sum(prev10)/10
                   if abs(roll5[i] - mean_prev10) >= 5.0:
                     change_point_count += 1
 
-          # Splits: by match_type
-          # We'll compute: win_rate, goal_diff_per_game, pass%, shot% per type
           def type_metrics(type_name):
             mm = [m for m in enhanced_matches if (m['match_type']==type_name)]
             if not mm: return {"count":0}
@@ -511,7 +476,6 @@ jobs:
               'win_rate': safe_div(w2, n2)*100,
               'goal_diff_per_game': safe_div((gf2-ga2), n2)
             }
-            # pass/shot % using totals
             pm = sum(m['our_passes_made'] for m in mm); pa = sum(m['our_pass_attempts'] for m in mm)
             sh = sum(m['our_shots'] for m in mm)
             aggs['pass_pct'] = safe_div(pm, pa)*100
@@ -521,8 +485,6 @@ jobs:
           match_types = [r['match_type'] for r in q(conn, "SELECT DISTINCT match_type FROM match_clubs WHERE club_id='19798'")]
           splits_by_type = {str(t): type_metrics(t) for t in match_types}
 
-          # Splits: by opponent archetype (aggregated vs-us behavior)
-          # Define archetypes using shares vs us on a per-match basis; then aggregate our outcomes.
           def archetype_buckets():
             buckets = {
               'opp_high_possession': [],
@@ -533,7 +495,6 @@ jobs:
             for m in enhanced_matches:
               opp_poss_share = safe_div(m['opp_pass_attempts'], (m['our_pass_attempts'] + m['opp_pass_attempts']))
               opp_shot_share = safe_div(m['opp_shots'], (m['our_shots'] + m['opp_shots']))
-              # thresholds: 0.55
               if opp_poss_share >= 0.55: buckets['opp_high_possession'].append(m)
               else: buckets['opp_low_possession'].append(m)
               if opp_shot_share >= 0.55: buckets['opp_high_shots'].append(m)
@@ -553,7 +514,6 @@ jobs:
             return {k: pack(v) for k, v in buckets.items()}
           splits_by_archetype = archetype_buckets()
 
-          # Splits: by period (early/mid/late thirds)
           thirds = {'early': [], 'mid': [], 'late': []}
           if n:
             cut1 = n//3
@@ -578,10 +538,8 @@ jobs:
             }
           splits_by_period = {k: pack_period(v) for k,v in thirds.items()}
 
-          # Head-to-head (aggregate) summary for top opponents by count
           opp_counter = Counter(m['opponent_team_id'] for m in enhanced_matches)
           top_opponents = [tid for tid,_ in opp_counter.most_common(10)]
-          # Season baselines for deltas
           season_pass_pct_baseline = season_pass_pct
           season_shot_pct_baseline = season_shot_pct
           h2h_summary = []
@@ -605,8 +563,6 @@ jobs:
               'shot_delta_vs_season': (shot_pct_h2h - season_shot_pct_baseline)
             })
 
-          # Squad impact: with/without + top pairs
-          # Build presence map per match for our players
           match_players = {}
           all_player_ids = set()
           for m in enhanced_matches:
@@ -618,12 +574,6 @@ jobs:
             match_players[m['match_id']] = rows
             all_player_ids.update(r['player_id'] for r in rows)
 
-          # Season aggregates needed for with/without
-          total_pass_made = sum(m['our_passes_made'] for m in enhanced_matches)
-          total_pass_attempts = sum(m['our_pass_attempts'] for m in enhanced_matches)
-          total_shots_season = sum(m['our_shots'] for m in enhanced_matches)
-
-          # Prepare per-match quick lookups
           match_pass_made = {m['match_id']: m['our_passes_made'] for m in enhanced_matches}
           match_pass_att  = {m['match_id']: m['our_pass_attempts'] for m in enhanced_matches}
           match_shots     = {m['match_id']: m['our_shots'] for m in enhanced_matches}
@@ -631,9 +581,7 @@ jobs:
           match_result    = {m['match_id']: m['result'] for m in enhanced_matches}
 
           with_without = []
-          # Only consider players with at least 5 appearances
           min_apps = 5
-          # Build set of matches each player played
           player_matches = defaultdict(set)
           player_names = {}
           for mid, rows in match_players.items():
@@ -673,12 +621,10 @@ jobs:
               'delta_goals_for_per_game': (gpg_w - gpg_wo)
             })
 
-          # Top chemistry pairs (by goal contributions per game when both play)
           pair_stats = defaultdict(lambda: {'matches':0, 'goals':0, 'assists':0})
           for mid, rows in match_players.items():
             ids = [r['player_id'] for r in rows]
             contrib = {r['player_id']: (r['goals'] or 0) + (r['assists'] or 0) for r in rows}
-            # build all unordered pairs in this match
             for i in range(len(ids)):
               for j in range(i+1, len(ids)):
                 a, b = sorted((ids[i], ids[j]))
@@ -686,7 +632,7 @@ jobs:
                 pair_stats[(a,b)]['goals'] += (contrib.get(a,0) + contrib.get(b,0))
           top_pairs = []
           for (a,b), st in pair_stats.items():
-            if st['matches'] < 5:  # minimum together appearances
+            if st['matches'] < 5:
               continue
             top_pairs.append({
               'player1_id': a,
@@ -753,7 +699,6 @@ jobs:
 
           conn.close()
           PY
-
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
