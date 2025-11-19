@@ -308,6 +308,7 @@ async def main():
     total_new_matches = 0
     total_existing_matches = 0
     all_matches_count = 0
+    fetch_status = 'success'
 
     # Start Zendriver browser with CI-friendly options
     print("\n🌐 Starting browser...")
@@ -330,9 +331,10 @@ async def main():
         chrome_path = which("google-chrome") or which("chrome") or which("chromium") or "/usr/bin/google-chrome"
         browser_kwargs["browser_executable_path"] = chrome_path
 
-    browser = await zd.start(**browser_kwargs)
-    
+    browser = None
     try:
+        browser = await zd.start(**browser_kwargs)
+        
         # Fetch from each endpoint
         for endpoint in ENDPOINTS:
             print(f"\n📡 Fetching {endpoint['name']}...")
@@ -359,10 +361,19 @@ async def main():
             total_new_matches += new_matches
             total_existing_matches += existing_matches
             
+    except Exception as e:
+        # Catch any critical exception (like browser startup failure)
+        print(f"\nAn unexpected critical error occurred during fetch: {e}")
+        fetch_status = f'failed: {e.__class__.__name__}'
+        # Re-raise the exception to terminate with an error code
+        raise 
+        
     finally:
-        print("\n🧹 Closing browser...")
-        # Use await browser.close() as provided in the user's latest code
-        await browser.close()
+        # The fix: Use .stop() for zendriver cleanup
+        if browser:
+            print("\n🧹 Closing browser...")
+            # FIX: Use .stop() instead of .close()
+            await browser.stop()
     
     # Log the fetch into fetch_history table
     try:
@@ -370,7 +381,7 @@ async def main():
         cursor.execute("""
             INSERT INTO fetch_history (matches_found, new_matches_added, status)
             VALUES (?, ?, ?)
-        """, (all_matches_count, total_new_matches, 'success'))
+        """, (all_matches_count, total_new_matches, fetch_status))
         conn.commit()
     except Exception as e:
         print(f"⚠️ Error logging fetch history: {e}")
@@ -388,9 +399,12 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        # Wrap main() in asyncio.run() to execute
         asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nProcess interrupted by user.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        # Print a clearer error message for the user if main fails
+        if "Browser' object has no attribute 'close'" not in str(e):
+             print(f"An unexpected error occurred: {e}")
+        # The script will exit with an error code if an unhandled exception occurred during the fetch.
+        # If the failure was due to browser.close, it's now fixed.
         sys.exit(1)
