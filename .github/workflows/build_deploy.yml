@@ -34,9 +34,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
+        uses: browser-actions/setup-chrome@v2
 
       - name: Install system dependencies for Zendriver
         run: |
@@ -64,11 +62,8 @@ jobs:
             wget \
             ca-certificates \
             fonts-liberation
-          # Verify Chrome installation
-          echo "Checking for Chrome..."
-          which google-chrome && google-chrome --version || echo "Warning: google-chrome not found"
-          which chrome && chrome --version || echo "Note: chrome command not found"
-          which chromium-browser && chromium-browser --version || echo "Note: chromium-browser not found"
+          # Chrome should already be installed on GitHub Actions runners
+          which google-chrome || which chromium-browser || echo "Warning: Chrome not found in PATH"
 
       - name: Install Python dependencies
         run: |
