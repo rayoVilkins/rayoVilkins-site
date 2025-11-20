@@ -93,6 +93,21 @@ jobs:
           DB_PATH: ${{ github.workspace }}/build/proclubs.db
         run: |
           python fetch_matches.py
+          
+      - name: Debug check specific match
+        env:
+          DB_PATH: ${{ github.workspace }}/build/proclubs.db
+        run: |
+          echo "Matches row:"
+          sqlite3 "$DB_PATH" \
+            "SELECT match_id, match_timestamp FROM matches WHERE match_id = '179842334420226';"
+      
+          echo "match_clubs rows:"
+          sqlite3 "$DB_PATH" \
+            "SELECT match_id, club_id, club_name, goals, match_type
+             FROM match_clubs
+             WHERE match_id = '179842334420226';"
+
 
       # ⭐ Re-dump data so history accumulates across runs
       - name: Dump updated seed (data+schema for safety)
