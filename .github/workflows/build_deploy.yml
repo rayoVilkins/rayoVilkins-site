@@ -1,13 +1,7 @@
 name: Build & publish static site
 
-on:
-  schedule:
-    - cron: "0 5 * * *"    # daily at 05:00 UTC
-  workflow_dispatch: {}
-  push:
-    branches: [ "main" ]
-    paths-ignore:
-      - 'sql/seed_data.sql'  # avoid loops when we commit updated seed
+# Disabled: project retired. Re-add schedule/push/workflow_dispatch triggers to revive.
+on: {}
 
 permissions:
   contents: write
